@@ -1,0 +1,9 @@
+variable "environment"             { type = string }
+variable "account_id"              { type = string }
+variable "region"                  { type = string }
+variable "config_bucket_arn"       { type = string }
+variable "config_bucket_id"        { type = string }
+variable "kms_key_arn"             { type = string }
+variable "config_delivery_sns_arn" { type = string }
+variable "config_role_arn"         { type = string }
+variable "evaluator_function_arn"  { type = string }
