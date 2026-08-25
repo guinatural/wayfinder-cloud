@@ -1,0 +1,30 @@
+# =============================================================================
+# Wayfinder Cloud — terraform.tfvars (prod)
+# Copie para terraform.tfvars e preencha os valores reais.
+# NUNCA commite terraform.tfvars com valores reais (está no .gitignore).
+# Valores sensíveis devem ser fornecidos via variáveis de ambiente TF_VAR_*
+# ou via AWS Secrets Manager durante o pipeline CI/CD.
+# =============================================================================
+
+aws_region   = "us-east-1"
+aws_profile  = "wayfinder-prod"
+environment  = "prod"
+
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+# OBRIGATÓRIO: email do time de SecOps para alertas críticos
+# Em prod, use uma lista de distribuição: secops@vitacore.health
+alert_email = "secops@vitacore.health"
+
+# Slack (opcional — deixe vazio para desabilitar integração)
+slack_workspace_id = ""
+slack_channel_id   = ""
+
+# Retenção de auditoria em prod: 365 dias em S3 Standard antes de ir para Glacier
+# Prontuários em prod usam Object Lock COMPLIANCE mode com 7.305 dias (20 anos)
+audit_retention_days = 365
+
+# Budget mensal em prod: $1050 USD (≈ R$ 5.250 a BRL 5,00)
+# Alertas em 80% ($840) e 100% ($1050)
+monthly_budget_limit = "1050"

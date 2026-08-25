@@ -1,0 +1,15 @@
+# Copie este arquivo para terraform.tfvars e preencha os valores
+# NUNCA commite terraform.tfvars com valores reais (está no .gitignore)
+
+aws_region   = "us-east-1"
+aws_profile  = "sentinel-dev"
+environment  = "dev"
+
+vpc_cidr           = "10.10.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+alert_email          = "seuemail@exemplo.com"
+slack_workspace_id   = ""  # Deixe vazio se não usar Slack
+slack_channel_id     = ""  # Deixe vazio se não usar Slack
+
+audit_retention_days = 90
