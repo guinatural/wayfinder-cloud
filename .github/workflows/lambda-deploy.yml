@@ -1,0 +1,156 @@
+﻿name: Lambda Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/lambdas/**'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  #  Testes unitários antes do deploy 
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install test dependencies
+        run: pip install pytest pytest-cov boto3 moto[all]
+
+      - name: Run tests
+        run: pytest src/ --cov=src --cov-report=term-missing -v
+        continue-on-error: false
+
+  #  Package e deploy das Lambdas que mudaram 
+  deploy-dev:
+    name: Deploy Lambdas  dev
+    runs-on: ubuntu-latest
+    needs: test
+    environment: dev
+
+    strategy:
+      matrix:
+        lambda:
+          - compliance-evaluator
+          - auto-remediation
+          - incident-notifier
+          - audit-reporter
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure AWS Credentials (dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region:            us-east-1
+
+      - name: Package Lambda  ${{ matrix.lambda }}
+        run: |
+          cd src/lambdas/${{ matrix.lambda }}
+          pip install -r requirements.txt -t package/ --quiet
+          cp handler.py package/
+          cd package && zip -r ../handler.zip . -q
+          echo "Package size: $(du -sh ../handler.zip | cut -f1)"
+
+      - name: Check if Lambda changed
+        id: changed
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            src/lambdas/${{ matrix.lambda }}/**
+
+      - name: Deploy Lambda  ${{ matrix.lambda }}
+        if: steps.changed.outputs.any_changed == 'true'
+        run: |
+          FUNCTION_NAME="wayfinder-dev-${{ matrix.lambda }}"
+          echo "Deploying to $FUNCTION_NAME..."
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://src/lambdas/${{ matrix.lambda }}/handler.zip \
+            --publish \
+            --no-cli-pager
+
+          # Aguardar update completar
+          aws lambda wait function-updated \
+            --function-name "$FUNCTION_NAME"
+          echo "Deploy concluído: $FUNCTION_NAME"
+
+      - name: Smoke test  invoke Lambda
+        if: steps.changed.outputs.any_changed == 'true'
+        run: |
+          FUNCTION_NAME="wayfinder-dev-${{ matrix.lambda }}"
+          # Invocação de teste com payload vazio para verificar que a função inicia
+          RESULT=$(aws lambda invoke \
+            --function-name "$FUNCTION_NAME" \
+            --payload '{"source":"github-actions","test":true}' \
+            --log-type Tail \
+            --no-cli-pager \
+            /tmp/lambda-response.json 2>&1)
+          STATUS=$(echo $RESULT | python3 -c "import sys,json; r=json.load(sys.stdin); print(r.get('StatusCode',0))")
+          echo "Lambda response status: $STATUS"
+          cat /tmp/lambda-response.json
+          # Status 200 = invocação bem-sucedida (erro de negócio é ok no smoke test)
+          [ "$STATUS" = "200" ] && echo "Smoke test passou" || (echo "Smoke test FALHOU" && exit 1)
+
+  #  Deploy prod (após dev com sucesso + aprovação manual) 
+  deploy-prod:
+    name: Deploy Lambdas  prod
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    environment: prod-approval
+
+    strategy:
+      matrix:
+        lambda:
+          - compliance-evaluator
+          - auto-remediation
+          - incident-notifier
+          - audit-reporter
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure AWS Credentials (prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region:            us-east-1
+
+      - name: Package Lambda  ${{ matrix.lambda }}
+        run: |
+          cd src/lambdas/${{ matrix.lambda }}
+          pip install -r requirements.txt -t package/ --quiet
+          cp handler.py package/
+          cd package && zip -r ../handler.zip . -q
+
+      - name: Deploy Lambda  ${{ matrix.lambda }} (prod)
+        run: |
+          FUNCTION_NAME="wayfinder-prod-${{ matrix.lambda }}"
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://src/lambdas/${{ matrix.lambda }}/handler.zip \
+            --publish \
+            --no-cli-pager
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+          echo "Prod deploy concluído: $FUNCTION_NAME"

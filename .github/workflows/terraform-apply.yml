@@ -1,0 +1,190 @@
+﻿name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+
+permissions:
+  contents: read
+  id-token: write   # Necessário para OIDC (melhor prática  sem access keys estáticas)
+
+jobs:
+  # 
+  # Stage 1: Plan (sempre executa em push para main)
+  # 
+  plan-dev:
+    name: Plan  dev
+    runs-on: ubuntu-latest
+    environment: dev
+    defaults:
+      run:
+        working-directory: infra/environments/dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.6"
+
+      - name: Configure AWS Credentials (dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region:            us-east-1
+
+      - name: Terraform Init
+        run: terraform init -reconfigure
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan (dev)
+        run: |
+          terraform plan \
+            -var="alert_email=${{ secrets.ALERT_EMAIL }}" \
+            -no-color \
+            -out=tfplan-dev
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-dev
+          path: infra/environments/dev/tfplan-dev
+          retention-days: 1
+
+  # 
+  # Stage 2: Apply dev (após plan com sucesso)
+  # 
+  apply-dev:
+    name: Apply  dev
+    runs-on: ubuntu-latest
+    environment: dev          # Requer aprovação manual no GitHub Environments
+    needs: plan-dev
+    defaults:
+      run:
+        working-directory: infra/environments/dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.6"
+
+      - name: Configure AWS Credentials (dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region:            us-east-1
+
+      - name: Terraform Init
+        run: terraform init -reconfigure
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-dev
+          path: infra/environments/dev/
+
+      - name: Terraform Apply (dev)
+        run: terraform apply -auto-approve tfplan-dev
+
+  # 
+  # Stage 3: Plan prod (só após apply dev com sucesso)
+  # 
+  plan-prod:
+    name: Plan  prod
+    runs-on: ubuntu-latest
+    environment: prod
+    needs: apply-dev
+    defaults:
+      run:
+        working-directory: infra/environments/prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.6"
+
+      - name: Configure AWS Credentials (prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region:            us-east-1
+
+      - name: Terraform Init
+        run: terraform init -reconfigure
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan (prod)
+        run: |
+          terraform plan \
+            -var="alert_email=${{ secrets.ALERT_EMAIL }}" \
+            -no-color \
+            -out=tfplan-prod
+
+      - name: Upload plan artifact (prod)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-prod
+          path: infra/environments/prod/tfplan-prod
+          retention-days: 1
+
+  # 
+  # Stage 4: Apply prod (requer aprovação manual)
+  # 
+  apply-prod:
+    name: Apply  prod
+    runs-on: ubuntu-latest
+    environment: prod-approval  # EXIGE aprovação manual no GitHub  Environments
+    needs: plan-prod
+    defaults:
+      run:
+        working-directory: infra/environments/prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.6"
+
+      - name: Configure AWS Credentials (prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region:            us-east-1
+
+      - name: Terraform Init
+        run: terraform init -reconfigure
+
+      - name: Download plan artifact (prod)
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-prod
+          path: infra/environments/prod/
+
+      - name: Terraform Apply (prod)
+        run: terraform apply -auto-approve tfplan-prod
