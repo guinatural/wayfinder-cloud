@@ -1,0 +1,12 @@
+variable "environment"             { type = string }
+variable "account_id"              { type = string }
+variable "region"                  { type = string }
+variable "audit_bucket_id"         { type = string }
+variable "audit_bucket_arn"        { type = string }
+variable "kms_key_arn"             { type = string }
+variable "critical_topic_arn"      { type = string }
+variable "warning_topic_arn"       { type = string }
+variable "info_topic_arn"          { type = string }
+variable "lambda_role_arn"         { type = string }
+variable "lambda_subnet_ids"       { type = list(string) }
+variable "lambda_security_group_id"{ type = string }
