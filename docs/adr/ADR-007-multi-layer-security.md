@@ -1,315 +1,317 @@
-﻿# ADR-007  Segurança em Múltiplas Camadas (Defense in Depth)
+﻿# ADR-007  Multi-Layer Security (Defense in Depth)
 
-**Status:** Aceito  
-**Data:** 2026-04-10  
-**Autores:** Bruno Oliveira (SecOps Lead), Rafael Santos (CTO)  
-**Revisores:** Ana Lima (DPO), Carla Mendes (Dev Lead)  
-**Motivação:** Post-mortem do incidente de 15/03/2026  bucket S3 público por 18 dias
+**Status:** Accepted
+**Date:** 2026-04-10
+**Authors:** Bruno Oliveira (SecOps Lead), Rafael Santos (CTO)
+**Reviewers:** Ana Lima (DPO), Carla Mendes (Dev Lead)
+**Motivation:** Post-mortem of the 2026-03-15 incident - S3 bucket public for 18 days
 
 ---
 
-## 1. Contexto
+## 1. Context
 
-O incidente de março de 2026 expôs uma falha crítica de arquitetura: a VitaCore Health
-dependia de **uma única camada de segurança**  Block Public Access configurado
-manualmente. Quando essa camada foi desabilitada acidentalmente por um desenvolvedor,
-não havia nenhuma outra barreira, nenhuma detecção e nenhuma remediação automática.
+The March 2026 incident exposed a critical architectural failure: VitaCore Health
+depended on **a single security layer** - Block Public Access configured manually.
+When that layer was accidentally disabled by a developer, there was no other barrier,
+no detection, and no automatic remediation.
 
-O resultado: 2.340 laudos de pacientes expostos publicamente por 18 dias, multa de
-R$ 420.000 da ANPD, e R$ 1,68M em contratos perdidos.
+The result: 2,340 patient reports publicly exposed for 18 days, a fine of
+R$ 420,000 from ANPD, and R$ 1.68M in lost contracts.
 
-**Lição aprendida:** Uma arquitetura robusta nunca deve depender de um único controle.
-Qualquer controle pode falhar  por erro humano, bug de software ou ação maliciosa.
-A questão não é "como evitamos que o controle falhe?" mas "o que acontece quando falha?"
+**Lesson learned:** A robust architecture must never depend on a single control.
+Any control can fail - by human error, software bug, or malicious action.
+The question is not "how do we prevent the control from failing?" but "what happens when it fails?"
 
-### 1.1 Análise de Falha do Incidente
+### 1.1 Incident Failure Analysis
 
 ```
-Única linha de defesa:
-  S3 Block Public Access (configuração manual, sem IaC)
-      
-       Dev júnior executa o comando errado
-              
-               Sem detecção  18 dias de exposição
+Single line of defense:
+  S3 Block Public Access (manual configuration, no IaC)
+      |
+      v
+       Junior dev runs the wrong command
+              |
+               v
+                No detection -> 18 days of exposure
 
-Com Defense in Depth (o que deveria existir):
-  Camada 1: S3 Block Public Access (configuração)
-  Camada 2: SCP conta deny-s3-public-access-enable (conta)
-  Camada 3: AWS Config WAYFINDER-002 (detecção < 5 min)
-  Camada 4: KMS CMK (dados ilegíveis mesmo se acessados)
-  Camada 5: CloudTrail data events (audit trail)
-  Camada 6: GuardDuty S3 protection (comportamento anômalo)
-  Camada 7: Processo de revisão de mudanças (humano)
+With Defense in Depth (what should have existed):
+  Layer 1: S3 Block Public Access (configuration)
+  Layer 2: SCP account deny-s3-public-access-enable (account)
+  Layer 3: AWS Config WAYFINDER-002 (detection < 5 min)
+  Layer 4: KMS CMK (data unreadable even if accessed)
+  Layer 5: CloudTrail data events (audit trail)
+  Layer 6: GuardDuty S3 protection (anomalous behavior)
+  Layer 7: Change review process (human)
 
-Com todas as 7 camadas ativas:
-  Mesmo que a Camada 1 falhe (erro humano)
-   Camada 2 impede ou dificulta a falha
-   Camada 3 detecta e remedia em < 5 minutos
-   Camada 4 garante que dados acessados são ilegíveis
-  Resultado: zero exposição efetiva de dados
+With all 7 layers active:
+  Even if Layer 1 fails (human error)
+   Layer 2 prevents or hinders the failure
+   Layer 3 detects and remediates in < 5 minutes
+   Layer 4 ensures accessed data is unreadable
+  Result: zero effective data exposure
 ```
 
 ---
 
-## 2. Decisão
+## 2. Decision
 
-**Implementar 7 camadas independentes de segurança** para cada tipo de dado e recurso
-da VitaCore Health, onde a falha de qualquer camada individual seja detectada e
-remediada automaticamente antes que cause impacto.
+**Implement 7 independent security layers** for each type of data and resource
+at VitaCore Health, where the failure of any individual layer is detected and
+automatically remediated before it causes impact.
 
-Este ADR documenta a arquitetura de Defense in Depth para a plataforma VitaCore
-monitorada pelo Wayfinder Cloud.
+This ADR documents the Defense in Depth architecture for the VitaCore platform
+monitored by Wayfinder Cloud.
 
 ---
 
-## 3. As 7 Camadas de Segurança
+## 3. The 7 Security Layers
 
-### Camada 1  Borda de Rede (CloudFront + WAF + Route 53)
+### Layer 1 - Network Edge (CloudFront + WAF + Route 53)
 
-**O que protege:** Tráfego externo antes de chegar à aplicação.
+**What it protects:** External traffic before reaching the application.
 
 ```
 Route 53 Health Checks
-   CloudFront (TLS 1.3 obrigatório, HTTPS only)
+   CloudFront (TLS 1.3 required, HTTPS only)
    WAF (OWASP Top 10, rate limiting, bot protection)
-   ACM (certificados gerenciados com renovação automática)
+   ACM (managed certificates with automatic renewal)
 
-Controles:
-  - TLS 1.3: sem downgrade para protocolos inseguros
-  - WAF SQL Injection rule: bloqueia tentativas antes de chegar à API
-  - Rate limiting: 1000 req/min por IP (proteção contra força bruta)
-  - HTTPS only: sem tráfego HTTP não criptografado
+Controls:
+  - TLS 1.3: no downgrade to insecure protocols
+  - WAF SQL Injection rule: blocks attempts before reaching the API
+  - Rate limiting: 1000 req/min per IP (brute force protection)
+  - HTTPS only: no unencrypted HTTP traffic
 
-Monitoramento Wayfinder:
+Wayfinder monitoring:
   - Config Rule: wafv2-webacl-not-empty
-  - CloudWatch Alarm: WAF BlockedRequests > 100/min  SNS WARNING
+  - CloudWatch Alarm: WAF BlockedRequests > 100/min -> SNS WARNING
 ```
 
-### Camada 2  Isolamento de Rede (VPC + Security Groups + Endpoints)
+### Layer 2 - Network Isolation (VPC + Security Groups + Endpoints)
 
-**O que protege:** Comunicação lateral entre serviços.
+**What it protects:** Lateral communication between services.
 
 ```
-VPC 10.0.0.0/16 com segregação de subnets:
-  Public:     ALB, NAT GW (sem dados de saúde)
-  Private App: ECS, Lambda (dados transitando)
-  Private Data: Aurora, Redis, DynamoDB (dados em repouso)
+VPC 10.0.0.0/16 with subnet segregation:
+  Public:      ALB, NAT GW (no health data)
+  Private App: ECS, Lambda (data in transit)
+  Private Data: Aurora, Redis, DynamoDB (data at rest)
 
-Security Groups (mínimo privilégio):
+Security Groups (minimum privilege):
   sg-alb:  ingress 443 ONLY from CloudFront IP ranges
   sg-app:  ingress 8080 from sg-alb ONLY
   sg-data: ingress 3306/6379 from sg-app ONLY; NO egress
 
-VPC Endpoints: serviços AWS sem tráfego pela internet
-VPC Flow Logs: habilitado em TODAS as VPCs
+VPC Endpoints: AWS services without internet traffic
+VPC Flow Logs: enabled on ALL VPCs
 
-Monitoramento Wayfinder:
-  - Config Rule: WAYFINDER-009 (SSH/DB portas expostas)
+Wayfinder monitoring:
+  - Config Rule: WAYFINDER-009 (SSH/DB ports exposed)
   - Config Rule: vpc-flow-logs-enabled
-  - Config Rule: WAYFINDER-006 (EC2 health em subnet pública)
+  - Config Rule: WAYFINDER-006 (EC2 health data in public subnet)
 ```
 
-### Camada 3  Autenticação e Autorização (Cognito + IAM + SCPs)
+### Layer 3 - Authentication and Authorization (Cognito + IAM + SCPs)
 
-**O que protege:** Quem pode fazer o quê em cada recurso.
+**What it protects:** Who can do what on each resource.
 
 ```
-Para usuários humanos:
-  - Cognito User Pools com MFA obrigatório para médicos
-  - IAM Identity Center (SSO) para acesso de engenheiros
-  - Permission sets com least privilege por função
+For human users:
+  - Cognito User Pools with mandatory MFA for doctors
+  - IAM Identity Center (SSO) for engineer access
+  - Permission sets with least privilege per role
 
-Para serviços e sistemas:
-  - IAM Roles com escopo mínimo por task ECS e Lambda
-  - Resource-based policies com condition tags
-  - SCPs na conta: deny-root-account, require-mfa, deny-public-s3
+For services and systems:
+  - IAM Roles with minimum scope per ECS task and Lambda
+  - Resource-based policies with condition tags
+  - SCPs on the account: deny-root-account, require-mfa, deny-public-s3
 
-Monitoramento Wayfinder:
+Wayfinder monitoring:
   - Config Rule: WAYFINDER-005 (IAM Action:*)
   - Config Rule: iam-root-access-key-check
   - Config Rule: mfa-enabled-for-iam-console-access
-  - Config Rule: WAYFINDER-012 (access key > 90 dias)
+  - Config Rule: WAYFINDER-012 (access key > 90 days)
 ```
 
-### Camada 4  Criptografia (KMS + TLS + Secrets Manager)
+### Layer 4 - Encryption (KMS + TLS + Secrets Manager)
 
-**O que protege:** Confidencialidade dos dados mesmo se acessados indevidamente.
+**What it protects:** Data confidentiality even if accessed inappropriately.
 
 ```
-Dados em repouso:
-  - S3: SSE-KMS com CMK por classificação de dado
-  - Aurora: criptografia KMS at-rest obrigatória
-  - DynamoDB: SSE com CMK para dados health-*
-  - ElastiCache Redis: criptografia at-rest + in-transit
-  - EBS: criptografia habilitada por default na conta
+Data at rest:
+  - S3: SSE-KMS with CMK per data classification
+  - Aurora: KMS at-rest encryption required
+  - DynamoDB: SSE with CMK for health-* data
+  - ElastiCache Redis: at-rest + in-transit encryption
+  - EBS: encryption enabled by default on the account
 
-Dados em trânsito:
-  - TLS 1.3 em todos os endpoints externos
-  - TLS em comunicação ECS  Aurora (enforce_ssl=1)
-  - HTTPS entre todos os componentes internos
+Data in transit:
+  - TLS 1.3 on all external endpoints
+  - TLS on ECS to Aurora communication (enforce_ssl=1)
+  - HTTPS between all internal components
 
-Segredos:
-  - Secrets Manager para credenciais DB e API keys
-  - Rotação automática de credenciais Aurora (30 dias)
-  - Sem hardcoded secrets (detectado por WAYFINDER-007/014)
+Secrets:
+  - Secrets Manager for DB credentials and API keys
+  - Automatic Aurora credential rotation (30 days)
+  - No hardcoded secrets (detected by WAYFINDER-007/014)
 
-Lição do incidente: mesmo com S3 público, dados com KMS CMK
-são ilegíveis sem a chave. Camada 4 seria a salvaguarda final.
+Incident lesson: even with a public S3, data with KMS CMK
+is unreadable without the key. Layer 4 would be the final safeguard.
 
-Monitoramento Wayfinder:
-  - WAYFINDER-001 (S3 sem KMS CMK)
-  - WAYFINDER-004 (RDS sem criptografia)
-  - WAYFINDER-007/014 (credenciais hardcoded)
+Wayfinder monitoring:
+  - WAYFINDER-001 (S3 without KMS CMK)
+  - WAYFINDER-004 (RDS without encryption)
+  - WAYFINDER-007/014 (hardcoded credentials)
   - Config Rule: encrypted-volumes
 ```
 
-### Camada 5  Conformidade Contínua (AWS Config + Wayfinder Rules)
+### Layer 5 - Continuous Compliance (AWS Config + Wayfinder Rules)
 
-**O que protege:** Garante que desvios das camadas 1-4 sejam detectados e corrigidos.
+**What it protects:** Ensures deviations from layers 1-4 are detected and fixed.
 
 ```
-Motor central: AWS Config com 24 rules
-  - Detecção de mudança de configuração em < 2 minutos
-  - WAYFINDER-002: detecta S3 público em < 5 minutos (teria salvado o incidente)
-  - Remediação automática para 8 categorias críticas
+Central engine: AWS Config with 24 rules
+  - Configuration change detection in < 2 minutes
+  - WAYFINDER-002: detects public S3 in < 5 minutes (would have saved the incident)
+  - Automatic remediation for 8 critical categories
 
-Pipeline de conformidade:
-  Config  EventBridge  Lambda compliance-evaluator
-     SNS (alerta) + Lambda auto-remediation (correção)
+Compliance pipeline:
+  Config -> EventBridge -> Lambda compliance-evaluator
+     SNS (alert) + Lambda auto-remediation (fix)
 
-Monitoramento de self:
-  - WAYFINDER-003 garante que o próprio CloudTrail está ativo
-  - CloudWatch Alarm se Config Recorder desabilitar
+Self-monitoring:
+  - WAYFINDER-003 ensures CloudTrail itself is active
+  - CloudWatch Alarm if Config Recorder disables
 
-Esta é a camada mais importante do Wayfinder Cloud 
-é a meta-camada que monitora todas as outras camadas.
+This is the most important layer in Wayfinder Cloud -
+it is the meta-layer that monitors all other layers.
 ```
 
-### Camada 6  Detecção de Ameaças (GuardDuty + Security Hub + Inspector)
+### Layer 6 - Threat Detection (GuardDuty + Security Hub + Inspector)
 
-**O que protege:** Ataques ativos, credenciais comprometidas, vulnerabilidades.
+**What it protects:** Active attacks, compromised credentials, vulnerabilities.
 
 ```
 GuardDuty (ML-based):
-  - Analisa CloudTrail + VPC Flow Logs + DNS logs
-  - Detecta: credenciais comprometidas, reconhecimento, C&C
-  - S3 Protection: acesso anômalo a buckets (incluindo cenário de março)
-  - Tempo de detecção: 15 min a 2h dependendo do finding type
+  - Analyzes CloudTrail + VPC Flow Logs + DNS logs
+  - Detects: compromised credentials, reconnaissance, C&C
+  - S3 Protection: anomalous bucket access (including the March scenario)
+  - Detection time: 15 min to 2h depending on finding type
 
 Security Hub:
-  - Agrega findings de GuardDuty, Inspector, Config
-  - Score FSBP e CIS: benchmark de maturidade da postura
-  - Meta: FSBP > 85% em produção
+  - Aggregates findings from GuardDuty, Inspector, Config
+  - FSBP and CIS score: security posture maturity benchmark
+  - Target: FSBP > 85% in production
 
 Inspector v2:
-  - Vulnerabilidades CVE em EC2 e imagens ECR
-  - Scan contínuo (não apenas no deploy)
-  - Integra com pipeline CI/CD via ECR on-push scan
+  - CVE vulnerabilities in EC2 and ECR images
+  - Continuous scanning (not just on deploy)
+  - Integrates with CI/CD pipeline via ECR on-push scan
 
-Monitoramento Wayfinder:
-  - EventBridge: GuardDuty findings  Lambda incident-notifier
+Wayfinder monitoring:
+  - EventBridge: GuardDuty findings -> Lambda incident-notifier
   - Config Rule: guardduty-enabled-centralized, securityhub-enabled
-  - RB-004: runbook de resposta a GuardDuty findings
+  - RB-004: runbook for GuardDuty findings response
 ```
 
-### Camada 7  Auditoria e Resposta (CloudTrail + S3 Object Lock + Processo)
+### Layer 7 - Audit and Response (CloudTrail + S3 Object Lock + Process)
 
-**O que protege:** Evidência forense imutável, responsabilização, conformidade legal.
+**What it protects:** Immutable forensic evidence, accountability, legal compliance.
 
 ```
-Trilha técnica:
-  - CloudTrail: 100% das API calls registradas (não pode ser desabilitado
-    sem WAYFINDER-003 alertar em 30 minutos)
-  - S3 data events: cada GET/PUT em dados health-critical registrado
-  - S3 Object Lock COMPLIANCE: trilha não pode ser alterada ou deletada
+Technical trail:
+  - CloudTrail: 100% of API calls recorded (cannot be disabled
+    without WAYFINDER-003 alerting within 30 minutes)
+  - S3 data events: each GET/PUT on health-critical data recorded
+  - S3 Object Lock COMPLIANCE: trail cannot be altered or deleted
 
-Resposta a incidentes:
-  - RB-001: processo de resposta a incidentes
-  - RB-004: resposta a GuardDuty findings
-  - Template LGPD art. 48 pré-preenchido pelo Lambda audit-reporter
-  - SLA interno: notificação ANPD em < 48h (folga de 24h do prazo legal)
+Incident response:
+  - RB-001: incident response process
+  - RB-004: GuardDuty findings response
+  - LGPD Art. 48 template pre-filled by Lambda audit-reporter
+  - Internal SLA: ANPD notification in < 48h (24h buffer from legal deadline)
 
-Lição do incidente: CloudTrail ativo com data events teria registrado
-cada GetObject do bucket exposto, permitindo quantificar o escopo exato
-da exposição (quantos objetos foram baixados e por quem).
+Incident lesson: CloudTrail active with data events would have recorded
+each GetObject from the exposed bucket, allowing exact scope quantification
+(how many objects were downloaded and by whom).
 
-Monitoramento Wayfinder:
+Wayfinder monitoring:
   - WAYFINDER-003 (CloudTrail status)
-  - WAYFINDER-013 (S3 Object Lock para retention-required)
-  - Relatório semanal automático via Lambda audit-reporter
+  - WAYFINDER-013 (S3 Object Lock for retention-required)
+  - Weekly automatic report via Lambda audit-reporter
 ```
 
 ---
 
-## 4. Mapeamento Camadas × Serviços Wayfinder
+## 4. Layer x Service Mapping
 
-| Camada | Serviços AWS | Config Rules | Lambda | SNS |
+| Layer | AWS Services | Config Rules | Lambda | SNS |
 |---|---|---|---|---|
-| 1  Borda | CloudFront, WAF, Route 53, ACM | wafv2-webacl-not-empty | incident-notifier | WARNING |
-| 2  Rede | VPC, SG, Endpoints, VPC Flow Logs | vpc-flow-logs-enabled, WAYFINDER-006/009 | auto-remediation | CRITICAL |
-| 3  AuthN/AuthZ | Cognito, IAM, IAM IC, SCPs | WAYFINDER-005/012, iam-root-access-key-check | auto-remediation | CRITICAL/HIGH |
-| 4  Criptografia | KMS, ACM, Secrets Manager | WAYFINDER-001/004/007/008/010/014 | auto-remediation | CRITICAL |
-| 5  Conformidade | AWS Config, EventBridge | WAYFINDER-001 a 015 | compliance-evaluator | CRITICAL/HIGH/MEDIUM |
-| 6  Ameaças | GuardDuty, Security Hub, Inspector | guardduty-enabled, securityhub-enabled | incident-notifier | CRITICAL |
-| 7  Auditoria | CloudTrail, S3 Object Lock, Athena | WAYFINDER-003/013, cloud-trail-enabled | audit-reporter | INFO |
+| 1 - Edge | CloudFront, WAF, Route 53, ACM | wafv2-webacl-not-empty | incident-notifier | WARNING |
+| 2 - Network | VPC, SG, Endpoints, VPC Flow Logs | vpc-flow-logs-enabled, WAYFINDER-006/009 | auto-remediation | CRITICAL |
+| 3 - AuthN/AuthZ | Cognito, IAM, IAM IC, SCPs | WAYFINDER-005/012, iam-root-access-key-check | auto-remediation | CRITICAL/HIGH |
+| 4 - Encryption | KMS, ACM, Secrets Manager | WAYFINDER-001/004/007/008/010/014 | auto-remediation | CRITICAL |
+| 5 - Compliance | AWS Config, EventBridge | WAYFINDER-001 to 015 | compliance-evaluator | CRITICAL/HIGH/MEDIUM |
+| 6 - Threats | GuardDuty, Security Hub, Inspector | guardduty-enabled, securityhub-enabled | incident-notifier | CRITICAL |
+| 7 - Audit | CloudTrail, S3 Object Lock, Athena | WAYFINDER-003/013, cloud-trail-enabled | audit-reporter | INFO |
 
 ---
 
-## 5. Trade-offs e Custos
+## 5. Trade-offs and Costs
 
-### 5.1 Custo Adicional das 7 Camadas
+### 5.1 Additional Cost of the 7 Layers
 
-| Serviço Adicional | Custo Mensal Prod | Custo Mensal Dev |
+| Additional Service | Monthly Cost Prod | Monthly Cost Dev |
 |---|---|---|
 | GuardDuty | $15 | $1.25 |
 | Security Hub | $3.50 | $0.75 |
 | Inspector v2 | $4.50 | $0.09 |
-| AWS Config (adicional) | $8 (novas rules) | $3 |
+| AWS Config (additional) | $8 (new rules) | $3 |
 | VPC Endpoints (10 interface) | $72 | $14.40 |
-| **Total camadas adicionais** | **~$103/mês** | **~$20/mês** |
+| **Total additional layers** | **~$103/month** | **~$20/month** |
 
-### 5.2 Custo do Incidente de Março vs Custo de Prevenção
+### 5.2 March Incident Cost vs Prevention Cost
 
 ```
-Custo do incidente de março: R$ 2.107.000 (estimado)
-Custo anual das 7 camadas (prod): ~$103/mês × 12 = $1.236/ano  R$ 6.180/ano
-Custo anual das 7 camadas (dev):  ~$20/mês × 12  = $240/ano   R$ 1.200/ano
+Cost of the March incident: R$ 2,107,000 (estimated)
+Annual cost of 7 layers (prod): ~$103/month x 12 = $1,236/year  = R$ 6,180/year
+Annual cost of 7 layers (dev):  ~$20/month x 12  = $240/year    = R$ 1,200/year
 
-ROI da Defense in Depth:
-  Investimento: R$ 7.380/ano
-  Custo evitado (1 incidente similar): R$ 2.107.000
-  ROI: 285x (28.500%)
+Defense in Depth ROI:
+  Investment: R$ 7,380/year
+  Avoided cost (1 similar incident): R$ 2,107,000
+  ROI: 285x (28,500%)
 
-Decisão: custo-benefício justifica amplamente o investimento.
+Decision: cost-benefit widely justifies the investment.
 ```
 
-### 5.3 Impacto Operacional
+### 5.3 Operational Impact
 
-| Aspecto | Impacto | Mitigação |
+| Aspect | Impact | Mitigation |
 |---|---|---|
-| Latência adicional (WAF) | +2-5ms por request | Irrelevante para aplicação de saúde |
-| Overhead de desenvolvimento | +10% tempo de setup de recurso | Módulos Terraform pré-configurados |
-| Falsos positivos de alertas | Risco de alert fatigue | Tuning de regras + supressão por tag |
-| Custo de storage (audit trail) | +$11/mês (500GB/5 anos) | S3 Intelligent-Tiering reduz custo |
+| Additional latency (WAF) | +2-5ms per request | Irrelevant for health application |
+| Development overhead | +10% resource setup time | Pre-configured Terraform modules |
+| Alert false positives | Risk of alert fatigue | Rule tuning + tag-based suppression |
+| Storage cost (audit trail) | +$11/month (500GB/5 years) | S3 Intelligent-Tiering reduces cost |
 
 ---
 
-## 6. Consequências
+## 6. Consequences
 
-**Positivas:**
-- Qualquer falha em uma camada é detectada e corrigida automaticamente (camadas 1-6)
-- Evidência forense imutável para qualquer incidente futuro (camada 7)
-- Conformidade com LGPD art. 46 ("medidas técnicas e administrativas") demonstrada
-- Base para certificação ISO 27001 (controles A.8.20, A.8.21, A.8.24, A.5.15)
-- O incidente de março com Wayfinder ativo: 0 dados expostos em vez de 2.340 laudos
+**Positive:**
+- Any failure in a layer is detected and corrected automatically (layers 1-6)
+- Immutable forensic evidence for any future incident (layer 7)
+- LGPD Art. 46 compliance ("technical and administrative measures") demonstrated
+- Foundation for ISO 27001 certification (controls A.8.20, A.8.21, A.8.24, A.5.15)
+- The March incident with Wayfinder active: 0 data exposed instead of 2,340 reports
 
-**Negativas:**
-- Custo adicional de ~$103/mês em prod (justificado pelo ROI demonstrado)
-- Maior complexidade arquitetural  mitigada por IaC e documentação
-- Time de desenvolvimento precisa considerar as 7 camadas ao criar novos recursos
+**Negative:**
+- Additional cost of ~$103/month in prod (justified by demonstrated ROI)
+- Greater architectural complexity - mitigated by IaC and documentation
+- Development team must consider the 7 layers when creating new resources
 
-**Métricas de sucesso:**
-- Zero incidentes de exposição de dados de saúde por 12 meses
-- P99 de detecção de desvio de conformidade < 5 minutos
-- Score FSBP > 85% e CIS > 80% em produção
-- 100% dos recursos com as 5 tags obrigatórias
+**Success metrics:**
+- Zero health data exposure incidents for 12 months
+- P99 compliance deviation detection < 5 minutes
+- FSBP score > 85% and CIS > 80% in production
+- 100% of resources with the 5 required tags

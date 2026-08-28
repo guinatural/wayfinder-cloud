@@ -1,97 +1,97 @@
-﻿# ADR-005  Estratégia de Observabilidade: CloudWatch Nativo + X-Ray
+﻿# ADR-005  Observability Strategy: Native CloudWatch + X-Ray
 
-**Status:** Aceito  
-**Data:** 2026-08-21  
-**Autor:** Guilherme Barreto Gomes  
-**Revisores:** 
-
----
-
-## Contexto
-
-O Wayfinder Cloud precisa de observabilidade em múltiplas camadas:
-
-1. **Infraestrutura**  métricas de CPU, memória, throttling das Lambdas
-2. **Compliance**  número de recursos NON_COMPLIANT por severidade, taxa de remediação
-3. **Aplicação**  erros nas Lambdas, latência, rastreamento de chamadas distribuídas
-4. **Auditoria**  logs estruturados de todas as ações tomadas pelo sistema
-
-O projeto opera 100% na AWS sem agentes externos, com orçamento de observabilidade a minimizar.
-A equipe é pequena (~2 engenheiros) e não pode operar uma plataforma de observabilidade adicional.
+**Status:** Accepted
+**Date:** 2026-08-21
+**Author:** Guilherme Barreto Gomes
+**Reviewers:**
 
 ---
 
-## Opções Avaliadas
+## Context
 
-### Opção 1: DataDog
-- **Prós:** Dashboard excelente, correlação de logs/métricas/traces, APM avançado
-- **Contras:** Custo ~$20-40/host/mês, requer agente instalado, dados saem da AWS, contrato longo prazo
-- **Custo estimado:** ~$500-2.000/mês para o projeto
+Wayfinder Cloud needs observability across multiple layers:
 
-### Opção 2: New Relic
-- **Prós:** Free tier generoso (100GB/mês), UI moderna, APM distribuído
-- **Contras:** Dados de auditoria sairiam da AWS (problema regulatório LGPD), latência adicional de ingestion
-- **Custo estimado:** $0 no free tier, mas com risco de lockout
+1. **Infrastructure** - CPU, memory, Lambda throttling metrics
+2. **Compliance** - number of NON_COMPLIANT resources by severity, remediation rate
+3. **Application** - Lambda errors, latency, distributed call tracing
+4. **Audit** - structured logs of all actions taken by the system
 
-### Opção 3: Grafana + Prometheus (auto-hospedado)
-- **Prós:** Open source, extremamente flexível, sem custo de licença
-- **Contras:** Requer EC2/ECS para hospedar (custo infra), operação manual de upgrades,
-  sem integração nativa com Config/CloudTrail
-
-### Opção 4: CloudWatch Nativo + X-Ray  **Escolhido**
-- **Prós:** Zero agente, integração nativa com todos os serviços AWS usados, dashboards como código (Terraform),
-  sem egress de dados fora da AWS, custo previsível
-- **Contras:** UI do CloudWatch menos polida que DataDog, métricas customizadas têm custo por PutMetricData
+The project runs 100% on AWS with no external agents, and has a minimized observability budget.
+The team is small (~2 engineers) and cannot operate an additional observability platform.
 
 ---
 
-## Decisão
+## Options Evaluated
 
-**CloudWatch Logs + Metrics + Alarms + Dashboards + X-Ray** foi escolhido como stack de observabilidade.
+### Option 1: DataDog
+- **Pros:** Excellent dashboard, logs/metrics/traces correlation, advanced APM
+- **Cons:** Cost ~$20-40/host/month, requires installed agent, data leaves AWS, long-term contract
+- **Estimated cost:** ~$500-2,000/month for the project
 
----
+### Option 2: New Relic
+- **Pros:** Generous free tier (100GB/month), modern UI, distributed APM
+- **Cons:** Audit data would leave AWS (LGPD regulatory issue), additional ingestion latency
+- **Estimated cost:** $0 on free tier, but with lockout risk
 
-## Justificativa
+### Option 3: Grafana + Prometheus (self-hosted)
+- **Pros:** Open source, extremely flexible, no license cost
+- **Cons:** Requires EC2/ECS to host (infra cost), manual upgrade operations,
+  no native integration with Config/CloudTrail
 
-### Custo
-CloudWatch tem custo por uso. Para o volume do Wayfinder Cloud (baixo número de eventos de compliance):
-- Log Groups: ~$0.50/GB ingerido
-- Métricas customizadas: ~$0.30/métrica/mês
-- Dashboards: $3/dashboard/mês
-- X-Ray: $5/milhão de traces
-
-Custo estimado total: **< $50/mês** vs $500-2.000/mês de ferramentas externas.
-
-### Integração Nativa
-CloudTrail, Config, Lambda e EventBridge já publicam métricas e logs no CloudWatch sem
-nenhuma configuração adicional. X-Ray se integra diretamente com Lambda via `tracing_config { mode = "Active" }`.
-
-### Sem Agente Externo
-Lambdas são efêmeras  instalar agentes DataDog/New Relic aumenta cold start e complexidade
-de deployment. CloudWatch SDK é embutido no runtime Python.
-
-### Dados Dentro da AWS (LGPD)
-Logs de compliance contêm metadados de recursos com dados de saúde. Manter tudo no CloudWatch
-garante que esses dados nunca saem da infraestrutura AWS controlada pela VitaCore Health.
-
-### Dashboards como Código
-`aws_cloudwatch_dashboard` no Terraform permite versionar e revisar mudanças no dashboard
-via pull request, como qualquer outra mudança de infraestrutura.
+### Option 4: Native CloudWatch + X-Ray - **Chosen**
+- **Pros:** Zero agent, native integration with all AWS services used, dashboards as code (Terraform),
+  no data egress outside AWS, predictable cost
+- **Cons:** CloudWatch UI less polished than DataDog, custom metrics have cost per PutMetricData
 
 ---
 
-## Trade-offs Aceitos
+## Decision
 
-| Trade-off | Impacto | Mitigação |
+**CloudWatch Logs + Metrics + Alarms + Dashboards + X-Ray** was chosen as the observability stack.
+
+---
+
+## Justification
+
+### Cost
+CloudWatch has usage-based cost. For Wayfinder Cloud volume (low number of compliance events):
+- Log Groups: ~$0.50/GB ingested
+- Custom metrics: ~$0.30/metric/month
+- Dashboards: $3/dashboard/month
+- X-Ray: $5/million traces
+
+Estimated total cost: **< $50/month** vs $500-2,000/month for external tools.
+
+### Native Integration
+CloudTrail, Config, Lambda, and EventBridge already publish metrics and logs to CloudWatch without
+any additional configuration. X-Ray integrates directly with Lambda via `tracing_config { mode = "Active" }`.
+
+### No External Agent
+Lambdas are ephemeral - installing DataDog/New Relic agents increases cold start and deployment
+complexity. CloudWatch SDK is built into the Python runtime.
+
+### Data Inside AWS (LGPD)
+Compliance logs contain resource metadata with health data. Keeping everything in CloudWatch
+ensures that data never leaves the AWS infrastructure controlled by VitaCore Health.
+
+### Dashboards as Code
+`aws_cloudwatch_dashboard` in Terraform allows versioning and reviewing dashboard changes
+via pull request, like any other infrastructure change.
+
+---
+
+## Trade-offs Accepted
+
+| Trade-off | Impact | Mitigation |
 |---|---|---|
-| UI menos rica que DataDog | Baixo  dashboards cumprem o necessário | CloudWatch tem melhorado continuamente |
-| Custo por PutMetricData | Baixo  ~100 eventos/dia | Agrupamento de métricas em batch |
-| Correlação logs-traces manual | Médio | X-Ray Service Map cobre a maioria dos casos |
-| Sem anomaly detection automática | Médio | CloudWatch Anomaly Detection disponível como evolução futura |
+| Less rich UI than DataDog | Low - dashboards meet the need | CloudWatch has been improving continuously |
+| Cost per PutMetricData | Low - ~100 events/day | Batch metric grouping |
+| Manual logs-traces correlation | Medium | X-Ray Service Map covers most cases |
+| No automatic anomaly detection | Medium | CloudWatch Anomaly Detection available as future enhancement |
 
 ---
 
-## Estrutura de Namespaces
+## Namespace Structure
 
 ```
 wayfinder/Compliance
@@ -101,35 +101,35 @@ wayfinder/Compliance
 wayfinder/Remediation
   - RemediationAttempt [RuleName, Status, Severity, Environment]
 
-AWS/Lambda (automático)
+AWS/Lambda (automatic)
   - Errors, Invocations, Duration, Throttles [FunctionName]
 ```
 
-## Estrutura de Log Groups
+## Log Group Structure
 
 ```
-/wayfinder/cloudtrail            Logs do CloudTrail (retenção: 365 dias)
-/wayfinder/lambda/compliance-evaluator  (retenção: 90 dias)
-/wayfinder/lambda/auto-remediation      (retenção: 90 dias)
-/wayfinder/lambda/incident-notifier     (retenção: 90 dias)
-/wayfinder/lambda/audit-reporter        (retenção: 90 dias)
+/wayfinder/cloudtrail                         CloudTrail logs (retention: 365 days)
+/wayfinder/lambda/compliance-evaluator        (retention: 90 days)
+/wayfinder/lambda/auto-remediation            (retention: 90 days)
+/wayfinder/lambda/incident-notifier           (retention: 90 days)
+/wayfinder/lambda/audit-reporter              (retention: 90 days)
 ```
 
 ---
 
-## Consequências
+## Consequences
 
-- Todos os logs das Lambdas DEVEM usar formato JSON estruturado para facilitar queries no Logs Insights
-- Alarmes DEVEM ser criados via Terraform (não manualmente no console)
-- Métricas customizadas DEVEM usar os namespaces definidos acima para consistência
-- X-Ray DEVE estar ativo em todas as Lambdas (`tracing_config { mode = "Active" }`)
-- Evoluções futuras (dashboards de negócio, SLOs) podem adicionar Grafana Cloud como camada de visualização
+- All Lambda logs MUST use structured JSON format to enable Logs Insights queries
+- Alarms MUST be created via Terraform (not manually in the console)
+- Custom metrics MUST use the namespaces defined above for consistency
+- X-Ray MUST be active on all Lambdas (`tracing_config { mode = "Active" }`)
+- Future enhancements (business dashboards, SLOs) can add Grafana Cloud as a visualization layer
 
 ---
 
-## Evolução Futura
+## Future Enhancements
 
-- **CloudWatch Contributor Insights** para identificar top contributors de violações
-- **CloudWatch Synthetics** para monitorar endpoints de relatórios
-- **AWS Health Dashboard** para correlacionar eventos de serviço com picos de violações
-- **Grafana Cloud** (free tier) como frontend visual adicional conectando ao CloudWatch via datasource
+- **CloudWatch Contributor Insights** to identify top violation contributors
+- **CloudWatch Synthetics** to monitor report endpoints
+- **AWS Health Dashboard** to correlate service events with violation spikes
+- **Grafana Cloud** (free tier) as an additional visual frontend connecting to CloudWatch via datasource

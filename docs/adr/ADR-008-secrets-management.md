@@ -1,163 +1,163 @@
-﻿# ADR-008  Estratégia de Gestão de Segredos
+﻿# ADR-008  Secrets Management Strategy
 
-**Status:** Aceito  
-**Data:** 2026-04-15  
-**Autores:** Bruno Oliveira (SecOps Lead), Carla Mendes (Dev Lead)  
-**Revisores:** Rafael Santos (CTO), Ana Lima (DPO)  
-**Motivação:** Credenciais hardcoded e sem rotação encontradas durante análise forense do incidente de março
+**Status:** Accepted
+**Date:** 2026-04-15
+**Authors:** Bruno Oliveira (SecOps Lead), Carla Mendes (Dev Lead)
+**Reviewers:** Rafael Santos (CTO), Ana Lima (DPO)
+**Motivation:** Hardcoded and unrotated credentials found during forensic analysis of the March incident
 
 ---
 
-## 1. Contexto
+## 1. Context
 
-Durante a investigação forense do incidente de março de 2026, a equipe de segurança
-identificou um problema adicional ao bucket público: **credenciais de banco de dados
-hardcoded em variáveis de ambiente de Lambda functions**.
+During the forensic investigation of the March 2026 incident, the security team
+identified an additional problem beyond the public bucket: **database credentials
+hardcoded in Lambda function environment variables**.
 
-Especificamente, foram encontradas:
+Specifically, they found:
 ```
 Lambda: vitacore-report-generator
-Variáveis de ambiente:
+Environment variables:
   DB_HOST=aurora-vitacore-legacy.cluster-xxx.us-east-1.rds.amazonaws.com
   DB_USER=admin
-  DB_PASSWORD=V1t@c0r3#2022   CREDENCIAL EM TEXTO PURO
-  
+  DB_PASSWORD=V1t@c0r3#2022   PLAIN TEXT CREDENTIAL
+
 Lambda: vitacore-lab-integration
-Variáveis de ambiente:
-  LAB_API_KEY=sk_live_xxxxxxxxxxxxxxxxxxx   API KEY EXTERNA
-  LAB_WEBHOOK_SECRET=whs_xxxxxxxxxxxxxxxx   SECRET DE WEBHOOK
+Environment variables:
+  LAB_API_KEY=sk_live_xxxxxxxxxxxxxxxxxxx   EXTERNAL API KEY
+  LAB_WEBHOOK_SECRET=whs_xxxxxxxxxxxxxxxx   WEBHOOK SECRET
 ```
 
-Além disso, o inventário revelou:
-- 67 IAM Users com access keys sem rotação há mais de 180 dias
-- 3 scripts de deploy com credenciais hardcoded em repositórios privados
-- 1 credencial de banco em plain text em um arquivo de configuração no S3
+The inventory also revealed:
+- 67 IAM Users with access keys not rotated for more than 180 days
+- 3 deploy scripts with hardcoded credentials in private repositories
+- 1 plain text database credential in a configuration file on S3
 
-**Impacto potencial:** Se um atacante tivesse obtido as credenciais durante o
-período de exposição do bucket S3, poderia ter acessado o banco de dados Aurora
-com privilégios de administrador  expondo os 127.000 prontuários completos.
+**Potential impact:** If an attacker had obtained the credentials during the S3 bucket
+exposure period, they could have accessed the Aurora database with administrator privileges,
+exposing all 127,000 complete patient records.
 
 ---
 
-## 2. Opções Consideradas
+## 2. Options Considered
 
-### Opção A: AWS Secrets Manager (ESCOLHIDA)
+### Option A: AWS Secrets Manager (CHOSEN)
 
-**Descrição:** Serviço gerenciado da AWS para armazenar, rotacionar e recuperar
-credenciais e segredos de forma segura.
+**Description:** AWS managed service to securely store, rotate, and retrieve
+credentials and secrets.
 
-**Prós:**
-- Rotação automática nativa para Aurora MySQL (sem downtime via dual-password)
-- Integração nativa com ECS (envFrom em task definitions) e Lambda (SDK call)
-- Versionamento de segredos (AWSCURRENT, AWSPENDING, AWSPREVIOUS)
-- Auditoria via CloudTrail de cada GetSecretValue
-- KMS CMK para criptografia do valor do segredo
-- Replicação multi-region (para futuro disaster recovery)
+**Pros:**
+- Native automatic rotation for Aurora MySQL (zero downtime via dual-password)
+- Native integration with ECS (envFrom in task definitions) and Lambda (SDK call)
+- Secret versioning (AWSCURRENT, AWSPENDING, AWSPREVIOUS)
+- CloudTrail audit of each GetSecretValue call
+- KMS CMK for encrypting the secret value
+- Multi-region replication (for future disaster recovery)
 
-**Contras:**
-- Custo: $0.40/secret/mês + $0.05/10.000 chamadas de API
-- Latência adicional de ~1-5ms no startup do serviço (mitigado com cache)
-- 15 segredos = $6/mês  custo aceitável dado o risco
+**Cons:**
+- Cost: $0.40/secret/month + $0.05/10,000 API calls
+- Additional ~1-5ms latency on service startup (mitigated with cache)
+- 15 secrets = $6/month - acceptable cost given the risk
 
-### Opção B: AWS Systems Manager Parameter Store SecureString
+### Option B: AWS Systems Manager Parameter Store SecureString
 
-**Descrição:** Parameter Store com criptografia KMS para valores sensíveis.
+**Description:** Parameter Store with KMS encryption for sensitive values.
 
-**Prós:**
-- Custo: $0.05/parâmetro advanced/mês (mais barato que Secrets Manager)
-- Integrado ao SSM Agent e Lambda natively
-- Hierarquia de parâmetros com paths (/vitacore/prod/db/password)
+**Pros:**
+- Cost: $0.05/advanced parameter/month (cheaper than Secrets Manager)
+- Natively integrated with SSM Agent and Lambda
+- Parameter hierarchy with paths (/vitacore/prod/db/password)
 
-**Contras:**
-- **Sem rotação automática**  exige Lambda customizado para rotação
-- Sem versionamento explícito com labels (AWSCURRENT/AWSPENDING)
-- Sem suporte nativo a multi-region
-- Sem built-in rotation para RDS/Aurora  ponto crítico para a VitaCore
+**Cons:**
+- **No automatic rotation** - requires a custom Lambda for rotation
+- No explicit versioning with labels (AWSCURRENT/AWSPENDING)
+- No native multi-region support
+- No built-in rotation for RDS/Aurora - critical blocker for VitaCore
 
-**Descartado:** A ausência de rotação automática para Aurora é um bloqueador.
-O time não tem capacidade de manter Lambdas de rotação customizados.
+**Discarded:** The absence of automatic rotation for Aurora is a blocker.
+The team does not have capacity to maintain custom rotation Lambdas.
 
-### Opção C: HashiCorp Vault
+### Option C: HashiCorp Vault
 
-**Descrição:** Solução open-source de gestão de segredos, self-hosted ou HCP Vault.
+**Description:** Open-source secrets management solution, self-hosted or HCP Vault.
 
-**Prós:**
-- Extremamente flexível, suporta qualquer tipo de segredo
-- Dynamic secrets: credenciais temporárias geradas on-demand (ideal para banco)
-- Audit log granular, políticas complexas
+**Pros:**
+- Extremely flexible, supports any type of secret
+- Dynamic secrets: temporary credentials generated on-demand (ideal for database)
+- Granular audit log, complex policies
 - Vendor-agnostic
 
-**Contras:**
-- **Overhead operacional:** requer cluster dedicado, HA, backup, patching
-- **Equipe sem experiência:** nenhum dos 23 engenheiros tem experiência com Vault
-- Custo de infra: ~$200/mês para cluster HA + HCP Vault custo adicional
-- HCP Vault (managed): $0.03/hora + $0.003/secret/mês  mais caro que Secrets Manager para este volume
+**Cons:**
+- **Operational overhead:** requires a dedicated cluster, HA, backup, patching
+- **No team experience:** none of the 23 engineers has experience with Vault
+- Infrastructure cost: ~$200/month for HA cluster + HCP Vault additional cost
+- HCP Vault (managed): $0.03/hour + $0.003/secret/month - more expensive than Secrets Manager for this volume
 
-**Descartado:** Overhead operacional inaceitável para time sem dedicated SRE.
+**Discarded:** Unacceptable operational overhead for a team without dedicated SRE.
 
-### Opção D: Variáveis de Ambiente Criptografadas (status quo melhorado)
+### Option D: Encrypted Environment Variables (improved status quo)
 
-**Descrição:** Manter env vars mas criptografar com KMS antes de armazenar.
+**Description:** Keep env vars but encrypt with KMS before storing.
 
-**Prós:**
-- Sem mudança na forma de acesso pelo código
-- Sem custo adicional além do KMS
+**Pros:**
+- No change in how the code accesses the value
+- No additional cost beyond KMS
 
-**Contras:**
-- **Sem rotação automática**  mesma limitação da Opção B
-- Credencial ainda visível (decriptada) para qualquer pessoa com acesso à Lambda
-- Não resolve o problema de inventário (como saber onde estão todos os segredos?)
-- CloudTrail não registra acesso ao valor da variável de ambiente
+**Cons:**
+- **No automatic rotation** - same limitation as Option B
+- Credential still visible (decrypted) to anyone with Lambda access
+- Does not solve the inventory problem (how to know where all secrets are?)
+- CloudTrail does not record access to the environment variable value
 
-**Descartado:** Não resolve os problemas identificados de forma adequada.
+**Discarded:** Does not adequately solve the identified problems.
 
 ---
 
-## 3. Decisão
+## 3. Decision
 
-**Secrets Manager para credenciais de banco de dados e API keys externas.**
-**Parameter Store (SecureString) para configurações não-sensíveis.**
+**Secrets Manager for database credentials and external API keys.**
+**Parameter Store (SecureString) for non-sensitive configurations.**
 
-### 3.1 O que vai para o Secrets Manager
+### 3.1 What Goes to Secrets Manager
 
-| Segredo | Tipo | Rotação | Intervalo |
+| Secret | Type | Rotation | Interval |
 |---|---|---|---|
-| Aurora writer credentials (3 clusters) | RDS | Lambda built-in | 30 dias |
-| Aurora reader credentials | RDS | Lambda built-in | 30 dias |
-| ElastiCache Redis AUTH token | Outro | Manual (alert) | 90 dias |
-| API keys de laboratórios (12 labs) | Outro | Manual (alert) | 90 dias |
-| Chaves de integração operadoras (3) | Outro | Manual (alert) | 90 dias |
-| Cognito Client Secret | Outro | Manual (alert) | 180 dias |
-| Webhook secrets (2) | Outro | Manual (alert) | 90 dias |
+| Aurora writer credentials (3 clusters) | RDS | Built-in Lambda | 30 days |
+| Aurora reader credentials | RDS | Built-in Lambda | 30 days |
+| ElastiCache Redis AUTH token | Other | Manual (alert) | 90 days |
+| Laboratory API keys (12 labs) | Other | Manual (alert) | 90 days |
+| Health plan integration keys (3) | Other | Manual (alert) | 90 days |
+| Cognito Client Secret | Other | Manual (alert) | 180 days |
+| Webhook secrets (2) | Other | Manual (alert) | 90 days |
 
-**Total: ~15 segredos × $0.40 = $6/mês**
+**Total: ~15 secrets x $0.40 = $6/month**
 
-### 3.2 O que vai para o Parameter Store
+### 3.2 What Goes to Parameter Store
 
-| Parâmetro | Tipo | Exemplo |
+| Parameter | Type | Example |
 |---|---|---|
-| URLs de serviços externos | String | /vitacore/prod/lab/endpoint |
+| External service URLs | String | /vitacore/prod/lab/endpoint |
 | Feature flags | String | /vitacore/prod/features/telehealth-enabled |
-| Configurações de timeout | String | /vitacore/prod/api/timeout-ms |
-| Endereços de endpoints internos | String | /vitacore/prod/redis/endpoint |
+| Timeout configurations | String | /vitacore/prod/api/timeout-ms |
+| Internal endpoint addresses | String | /vitacore/prod/redis/endpoint |
 
 ---
 
-## 4. Rotação Automática de Credenciais Aurora
+## 4. Automatic Aurora Credential Rotation
 
-O Secrets Manager oferece rotação nativa para Aurora MySQL usando a estratégia
-**dual-password** (zero downtime):
+Secrets Manager offers native rotation for Aurora MySQL using the
+**dual-password** strategy (zero downtime):
 
 ```
-Rotação automática (a cada 30 dias):
-  1. Secrets Manager cria nova senha temporária
-  2. Atualiza o usuário no Aurora MySQL (mantém senha anterior ativa)
-  3. Testa nova senha via AWSPENDING rotation Lambda
-  4. Se teste ok: AWSPENDING  AWSCURRENT, antiga  AWSPREVIOUS
-  5. Aurora aceita ambas as senhas por 24h (janela de transição)
-  6. Serviços buscam AWSCURRENT no próximo cold start/refresh
+Automatic rotation (every 30 days):
+  1. Secrets Manager creates a new temporary password
+  2. Updates the user in Aurora MySQL (keeps previous password active)
+  3. Tests new password via AWSPENDING rotation Lambda
+  4. If test OK: AWSPENDING -> AWSCURRENT, old -> AWSPREVIOUS
+  5. Aurora accepts both passwords for 24h (transition window)
+  6. Services fetch AWSCURRENT on next cold start/refresh
 
-Resultado: zero downtime, zero intervenção manual, sem exposição de senha.
+Result: zero downtime, zero manual intervention, no password exposure.
 
 Terraform:
 resource "aws_secretsmanager_secret_rotation" "aurora_writer" {
@@ -171,39 +171,39 @@ resource "aws_secretsmanager_secret_rotation" "aurora_writer" {
 
 ---
 
-## 5. Migração das Credenciais Existentes
+## 5. Migration of Existing Credentials
 
-### 5.1 Inventário e Migração (Plano de 30 dias)
+### 5.1 Inventory and Migration (30-day Plan)
 
 ```
-Semana 1: Inventário completo
-   Audit de todas as Lambdas: variáveis de ambiente suspeitas
-   Audit de todos os repositórios Git: grep por senha/password/key
-   Audit de S3 (arquivos de configuração)
-   Output: planilha com todos os segredos identificados e localização
+Week 1: Full inventory
+   Audit all Lambdas: suspicious environment variables
+   Audit all Git repositories: grep for password/key
+   Audit S3 (configuration files)
+   Output: spreadsheet with all identified secrets and locations
 
-Semana 2: Migração das credenciais de banco (prioridade máxima)
-   Criar secrets no Secrets Manager para 3 clusters Aurora
-   Habilitar rotação automática
-   Atualizar task definitions ECS e Lambdas para usar envFrom/SDK
-   Testar em dev  staging  prod
-   Deletar variáveis de ambiente antigas
+Week 2: Database credential migration (highest priority)
+   Create secrets in Secrets Manager for 3 Aurora clusters
+   Enable automatic rotation
+   Update ECS task definitions and Lambdas to use envFrom/SDK
+   Test in dev -> staging -> prod
+   Delete old environment variables
 
-Semana 3: Migração de API keys externas
-   Criar secrets para chaves de laboratórios e operadoras
-   Atualizar código de integração para buscar do Secrets Manager
-   Rotar todas as keys no sistema de origem (invalidar antigas)
+Week 3: External API key migration
+   Create secrets for laboratory and health plan keys
+   Update integration code to fetch from Secrets Manager
+   Rotate all keys in the source system (invalidate old ones)
 
-Semana 4: Validação e controle
-   WAYFINDER-007 e WAYFINDER-014 habilitados em todas as Lambdas
-   Zero findings dessas rules = migração completa
-   Documentar cada segredo no Secrets Manager com tags e owner
+Week 4: Validation and control
+   WAYFINDER-007 and WAYFINDER-014 enabled on all Lambdas
+   Zero findings from these rules = migration complete
+   Document each secret in Secrets Manager with tags and owner
 ```
 
-### 5.2 Padrão de Código para Busca de Segredos
+### 5.2 Code Pattern for Secret Retrieval
 
 ```python
-# Padrão recomendado: cache local com TTL para evitar latência
+# Recommended pattern: local cache with TTL to avoid latency
 import boto3
 import json
 from functools import lru_cache
@@ -213,22 +213,22 @@ _secrets_cache = {}
 _cache_ttl = timedelta(hours=1)
 
 def get_secret(secret_name: str) -> dict:
-    """Busca segredo do Secrets Manager com cache de 1 hora."""
+    """Retrieves secret from Secrets Manager with 1-hour cache."""
     now = datetime.utcnow()
-    
+
     if secret_name in _secrets_cache:
         value, cached_at = _secrets_cache[secret_name]
         if now - cached_at < _cache_ttl:
-            return value  # Cache hit  sem latência adicional
-    
+            return value  # Cache hit - no additional latency
+
     client = boto3.client('secretsmanager', region_name='us-east-1')
     response = client.get_secret_value(SecretId=secret_name)
     value = json.loads(response['SecretString'])
     _secrets_cache[secret_name] = (value, now)
-    
+
     return value
 
-# Uso:
+# Usage:
 db_creds = get_secret('vitacore/prod/aurora/writer')
 connection = mysql.connect(
     host=db_creds['host'],
@@ -240,12 +240,12 @@ connection = mysql.connect(
 
 ---
 
-## 6. Controles Detectivos  WAYFINDER-007 e WAYFINDER-014
+## 6. Detective Controls - WAYFINDER-007 and WAYFINDER-014
 
-### WAYFINDER-007  Credenciais em Variáveis de Ambiente Lambda
+### WAYFINDER-007 - Credentials in Lambda Environment Variables
 
 ```python
-# Lógica do compliance-evaluator para WAYFINDER-007
+# compliance-evaluator logic for WAYFINDER-007
 SENSITIVE_PATTERNS = re.compile(
     r'(password|passwd|secret|db_pass|api_key|token|credential|auth)',
     re.IGNORECASE
@@ -254,72 +254,72 @@ ARN_PATTERN = re.compile(r'^arn:aws:secretsmanager:')
 
 def evaluate_lambda_env_vars(config_item):
     env_vars = config_item.get('configuration', {}).get('environment', {}).get('variables', {})
-    
+
     for key, value in env_vars.items():
         if SENSITIVE_PATTERNS.search(key):
             if not ARN_PATTERN.match(str(value)):
                 return {
                     'compliance': 'NON_COMPLIANT',
-                    'annotation': f'Variável {key} parece conter credencial. '
-                                  f'Use Secrets Manager ARN em vez do valor direto.',
+                    'annotation': f'Variable {key} appears to contain a credential. '
+                                  f'Use Secrets Manager ARN instead of the direct value.',
                     'severity': 'HIGH',
                     'lgpd': 'Art. 46'
                 }
-    
+
     return {'compliance': 'COMPLIANT'}
 ```
 
-### WAYFINDER-014  Recursos sem Referência ao Secrets Manager
+### WAYFINDER-014 - Resources without Secrets Manager Reference
 
 ```
-Lógica: um recurso com tag data-classification=health-* que não tem nenhuma
-referência a Secrets Manager ARN em suas configurações é suspeito.
+Logic: a resource with tag data-classification=health-* that has no reference
+to a Secrets Manager ARN in its configurations is suspicious.
 
-Para Lambdas: verificar se environment.variables tem algum value com
-             padrão arn:aws:secretsmanager:
+For Lambdas: check if environment.variables has any value with
+             pattern arn:aws:secretsmanager:
 
-Para ECS Task Definitions: verificar se containerDefinitions tem
-             secrets[] com valueFrom apontando para Secrets Manager
+For ECS Task Definitions: check if containerDefinitions has
+             secrets[] with valueFrom pointing to Secrets Manager
 
-Para EC2: verificar se user-data ou tags têm referência (heurística)
+For EC2: check if user-data or tags have reference (heuristic)
 ```
 
 ---
 
-## 7. Custos Detalhados
+## 7. Detailed Costs
 
-| Item | Custo |
+| Item | Cost |
 |---|---|
-| 15 segredos × $0.40/mês | $6.00/mês |
-| 100k chamadas GetSecretValue/mês × $0.05/10k | $0.50/mês |
-| Rotação Lambda (inclusa no Secrets Manager) | $0.00 |
-| KMS para criptografia dos segredos (inclusa no vitacore-infra-key) | ~$0.10/mês |
-| **Total mensal** | **~$6.60/mês** |
+| 15 secrets x $0.40/month | $6.00/month |
+| 100k GetSecretValue calls/month x $0.05/10k | $0.50/month |
+| Rotation Lambda (included in Secrets Manager) | $0.00 |
+| KMS for secret encryption (included in vitacore-infra-key) | ~$0.10/month |
+| **Monthly total** | **~$6.60/month** |
 
-**Comparação com custo de um incidente similar ao de março:**
-- Custo de prevenção anual: ~$79/ano
-- Custo de 1 incidente: ~R$ 2.107.000
-- O Secrets Manager paga o ROI em 12 anos de prevenção  ou um único incidente evitado
+**Comparison with cost of an incident similar to March:**
+- Annual prevention cost: ~$79/year
+- Cost of 1 incident: ~R$ 2,107,000
+- Secrets Manager pays its ROI in 12 years of prevention - or a single avoided incident
 
 ---
 
-## 8. Consequências
+## 8. Consequences
 
-**Positivas:**
-- Zero credenciais em plain text no código ou variáveis de ambiente
-- Rotação automática de credenciais Aurora sem intervenção manual
-- Auditoria granular: CloudTrail registra cada GetSecretValue com quem acessou
-- WAYFINDER-007/014 detectam regressões (novo código com credencial hardcoded)
-- Conformidade com ISO 27001 A.8.11 (gestão de informação sigilosa)
-- LGPD art. 46: medidas técnicas para proteção de dados implementadas
+**Positive:**
+- Zero plain text credentials in code or environment variables
+- Automatic Aurora credential rotation without manual intervention
+- Granular audit: CloudTrail records each GetSecretValue with who accessed
+- WAYFINDER-007/014 detect regressions (new code with hardcoded credential)
+- Compliance with ISO 27001 A.8.11 (sensitive information management)
+- LGPD Art. 46: technical measures for data protection implemented
 
-**Negativas:**
-- Latência adicional de ~1-5ms no startup de cada serviço (mitigado com cache)
-- Desenvolvedores precisam aprender novo padrão de acesso a credenciais
-- $6.60/mês de custo adicional  justificado pelo ROI
+**Negative:**
+- Additional ~1-5ms latency on each service startup (mitigated with cache)
+- Developers need to learn new credential access pattern
+- $6.60/month additional cost - justified by ROI
 
-**Métricas de sucesso:**
-- Zero findings WAYFINDER-007 e WAYFINDER-014 após semana 4 da migração
-- 100% das credenciais Aurora com rotação automática habilitada
-- Zero credenciais expostas em repositórios Git (audit com git-secrets)
-- Config Rule `secretsmanager-rotation-enabled` com 100% compliance
+**Success metrics:**
+- Zero WAYFINDER-007 and WAYFINDER-014 findings after week 4 of migration
+- 100% of Aurora credentials with automatic rotation enabled
+- Zero credentials exposed in Git repositories (audit with git-secrets)
+- Config Rule `secretsmanager-rotation-enabled` at 100% compliance

@@ -1,8 +1,8 @@
 ﻿# Cenário de Negócio  VitaCore Health
 
-**Documento:** Contexto Empresarial e Motivação Técnica  
+**Documento:** Context Empresarial e Motivação Técnica  
 **Versão:** 1.0 | **Classificação:** Interno  Restrito  
-**Autor:** Equipe de Arquitetura  
+**Autor:** Equipe de Architecture  
 **Última atualização:** 2026-08-21
 
 ---
@@ -67,18 +67,18 @@ Impacto financeiro de incidente de 24h: ~R$ 81.960
 ## 2. Infraestrutura AWS  Estado Antes do Wayfinder Cloud
 
 A infraestrutura da VitaCore foi construída de forma incremental e reativa ao longo de
-dois anos, sem padrões de segurança formalizados. O resultado é um ambiente com
-147 recursos AWS em `us-east-1`, criados manualmente, sem IaC e sem controles de conformidade.
+dois anos, sem padrões de segurança formalizados. O resultado é um Environment com
+147 recursos AWS em `us-east-1`, criados manualmente, sem IaC e sem controles de Compliance.
 
 ### 2.1 Inventário de Recursos
 
-| Serviço | Quantidade | Problemas Identificados |
+| Serviço | Quantidade | Issues Identificados |
 |---|---|---|
 | S3 Buckets | 23 | 6 sem criptografia, 2 com acesso público acidentalmente habilitado |
 | Aurora MySQL | 3 clusters | 1 cluster sem criptografia em repouso (banco de histórico legacy) |
 | EC2 Instances | 18 | 4 em subnets públicas processando dados de pacientes |
 | IAM Users | 67 | Maioria com permissões excessivas herdadas do início da empresa |
-| IAM Roles | 12 com AdministratorAccess | Ativas em ambientes de produção |
+| IAM Roles | 12 com AdministratorAccess | Ativas em Environments de produção |
 | VPCs | 4 | Sem VPC Flow Logs em 2 delas |
 | CloudTrail | 1 trail | Ficou desabilitado por 43 dias após migração  não detectado |
 | GuardDuty | Não habilitado |  |
@@ -105,8 +105,8 @@ arn:aws:iam::123456789012:role/vitacore-deploy-role       (AdministratorAccess)
 arn:aws:iam::123456789012:role/vitacore-lambda-all        (AdministratorAccess)
 ```
 
-**Custo AWS crescente sem controle:**
-O custo AWS cresceu 23% ao mês nos últimos 4 meses. Sem tags de custo padronizadas,
+**Cost AWS crescente sem controle:**
+O Cost AWS cresceu 23% ao mês nos últimos 4 meses. Sem tags de Cost padronizadas,
 é impossível identificar qual produto ou equipe é responsável pelo crescimento.
 Estimativa: 30% dos recursos são ociosos ou superdimensionados.
 
@@ -114,7 +114,7 @@ Estimativa: 30% dos recursos são ociosos ou superdimensionados.
 
 ## 3. O Incidente de Março de 2026  Post-Mortem Detalhado
 
-Este incidente foi o catalisador direto para o projeto Wayfinder Cloud. Ele expõe
+Este incidente foi o catalisador direto para o Project Wayfinder Cloud. Ele expõe
 todas as falhas sistêmicas de governança de cloud da VitaCore.
 
 ### 3.1 Linha do Tempo
@@ -154,7 +154,7 @@ Dados pessoais sensíveis expostos por laudo:
   - Impressão diagnóstica (conclusão médica)
   - Número do CRM do médico
 
-Tipos de exame expostos:
+Types de exame expostos:
   - Radiografias (RX): 1.127 exames
   - Tomografias computadorizadas (TC): 891 exames
   - Ressonâncias magnéticas (RM): 322 exames
@@ -189,34 +189,34 @@ da conta AWS e ausência de detecção automática de mudanças de configuraçã
 
 > "Nenhum dado de paciente deve ficar exposto por mais de 5 minutos sem que alguém
 > na VitaCore seja alertado. Em 90 dias, teremos controles automáticos que tornam
-> este tipo de incidente impossível."*
+> este Type de incidente impossível."*
 >  Marcos Ferreira, CEO VitaCore Health, comunicado interno de 05/04/2026
 
 ---
 
-## 4. Objetivos do Projeto Wayfinder Cloud
+## 4. Objectives do Project Wayfinder Cloud
 
-### 4.1 Objetivos Primários (90 dias  compromisso CEO)
+### 4.1 Objectives Primários (90 dias  compromisso CEO)
 
-| # | Objetivo | Métrica de Sucesso | Responsável |
+| # | Objective | Métrica de Sucesso | Responsável |
 |---|---|---|---|
-| O1 | Detectar qualquer desvio de conformidade em menos de 5 minutos | P99 de detecção < 5 min (medido via CloudWatch) | Bruno Oliveira (SecOps) |
+| O1 | Detectar qualquer desvio de Compliance em menos de 5 minutos | P99 de detecção < 5 min (medido via CloudWatch) | Bruno Oliveira (SecOps) |
 | O2 | Remediação automática para 8 categorias de violações críticas | 100% das WAYFINDER-001/002/003/006/009 remediadas automaticamente | Bruno Oliveira |
-| O3 | Trilha de auditoria imutável de 5 anos | S3 Object Lock COMPLIANCE mode, 5 anos, auditado pelo externo | Ana Lima (DPO) |
+| O3 | Trilha de Audit imutável de 5 anos | S3 Object Lock COMPLIANCE mode, 5 anos, auditado pelo externo | Ana Lima (DPO) |
 | O4 | Processo formal de resposta a incidentes conforme LGPD art. 48 | SLA de notificação < 72h documentado e testado | Ana Lima |
 | O5 | Relatório semanal de postura de segurança para o Board | 100% dos relatórios entregues às sextas-feiras | Rafael Santos (CTO) |
 
-### 4.2 Objetivos Secundários (6 meses)
+### 4.2 Objectives Secundários (6 meses)
 
-| # | Objetivo | Métrica de Sucesso |
+| # | Objective | Métrica de Sucesso |
 |---|---|---|
-| O6 | Reduzir custo AWS em 15% | De ~R$ 47k/mês para ~R$ 40k/mês via rightsizing + lifecycle |
+| O6 | Reduzir Cost AWS em 15% | De ~R$ 47k/mês para ~R$ 40k/mês via rightsizing + lifecycle |
 | O7 | Zero recursos sem tags obrigatórias | Config Rule WAYFINDER-015, 100% compliance |
 | O8 | Preparação para ISO 27001 | Evidências de controles exportáveis via Athena |
 | O9 | Habilitar GuardDuty + Security Hub + Inspector v2 | 100% dos recursos cobertos, 0 findings CRITICAL não tratados |
 | O10 | Rotação automática de todas as credenciais de banco | Secrets Manager + Lambda rotator para todos os clusters Aurora |
 
-### 4.3 Objetivos Estratégicos (18 meses)
+### 4.3 Objectives Estratégicos (18 meses)
 
 - Certificação ISO 27001 obtida (requisito para contratos com planos de saúde)
 - Habilitar expansão para 4 e 5 estados (RS, PR) com governança cloud como pré-requisito
@@ -234,9 +234,9 @@ VitaCore após o incidente de março. Responsável pela relação com a ANPD.
 
 **Necessidades do Wayfinder Cloud:**
 - Relatórios semanais de compliance exportáveis em PDF (para o Board)
-- Evidências de controles para auditoria ISO 27001 (logs, configurações, histórico)
+- Evidências de controles para Audit ISO 27001 (logs, configurações, histórico)
 - Alertas imediatos quando dado sensível é exposto (< 5 minutos para acionar art. 48)
-- Dashboard com status de conformidade por artigo da LGPD
+- Dashboard com status de Compliance por artigo da LGPD
 - Trilha imutável de todas as ações de remediação
 
 **Citação:** *"Preciso saber imediatamente se um bucket com dados de paciente ficou
@@ -248,7 +248,7 @@ público, não 18 dias depois por email de um paciente."*
 Responsável pela decisão de aprovação de mudanças em produção.
 
 **Necessidades:**
-- Visibilidade de custo AWS em tempo real com breakdown por produto
+- Visibilidade de Cost AWS em tempo real com breakdown por produto
 - Resumo executivo semanal de risco (não técnico, orientado a negócio)
 - Aprovação de remediações automáticas via runbook versionado
 - KPIs de segurança para apresentar a investidores (Série A)
@@ -259,8 +259,8 @@ Responsável pela decisão de aprovação de mudanças em produção.
 Único profissional de segurança full-time da VitaCore (promovido após o incidente).
 
 **Necessidades:**
-- Alertas em tempo real com contexto suficiente para triagem (sem falsos positivos)
-- Playbooks de investigação para cada tipo de violação
+- Alertas em tempo real com Context suficiente para triagem (sem falsos positivos)
+- Playbooks de investigação para cada Type de violação
 - Integração com ferramentas existentes: Slack, PagerDuty, Jira
 - Queries Athena pré-construídas para investigação forense
 - Correlação entre GuardDuty findings e CloudTrail events
@@ -268,7 +268,7 @@ Responsável pela decisão de aprovação de mudanças em produção.
 ### 5.4 Carla Mendes  Dev Lead
 
 **Perfil:** Engenheira de software sênior, lidera o time de backend (9 pessoas).
-Resistência inicial ao projeto ("mais burocracia para o time").
+Resistência inicial ao Project ("mais burocracia para o time").
 
 **Necessidades:**
 - Feedback rápido quando criar recurso não conforme (< 5 min, antes do deploy em prod)
@@ -287,7 +287,7 @@ em Q2/2027 para emissão de certificado.
 - Evidências exportáveis de cada controle ISO 27001 mapeado
 - Histórico de pelo menos 6 meses de operação conforme
 - Demonstração de resposta a incidentes (simulações documentadas)
-- Logs imutáveis de auditoria (não editáveis pela empresa)
+- Logs imutáveis de Audit (não editáveis pela empresa)
 
 ---
 
@@ -326,7 +326,7 @@ Sistema de cobrança  RDS MySQL (financial-sensitive)
 
 ---
 
-## 7. Requisitos Legais e Regulatórios
+## 7. Requirements Legais e Regulatórios
 
 | Regulação | Aplicabilidade | Requisito Específico para Wayfinder |
 |---|---|---|
@@ -335,14 +335,14 @@ Sistema de cobrança  RDS MySQL (financial-sensitive)
 | **LGPD art. 37** | Direta  registro de operações | CloudTrail + Glue + Athena |
 | **CFM 1821/2007** | Prontuários digitais devem ser preservados por **20 anos** | S3 Object Lock por 20 anos para dados de prontuário |
 | **RDC ANVISA 204/2017** | Rastreabilidade de medicamentos prescritos | Imutabilidade de prescrições eletrônicas |
-| **CFM Telemedicina (2022/2023)** | Requisitos de gravação e prontuário | Gravações S3 com Object Lock + associação ao prontuário |
+| **CFM Telemedicina (2022/2023)** | Requirements de gravação e prontuário | Gravações S3 com Object Lock + associação ao prontuário |
 | **ISO 27001** | Meta de certificação | Evidências de controles A.8, A.9, A.12, A.16 |
 
 ---
 
-## 8. Critérios de Aceitação do Projeto
+## 8. Critérios de Aceitação do Project
 
-O projeto Wayfinder Cloud será considerado bem-sucedido quando:
+O Project Wayfinder Cloud será considerado bem-sucedido quando:
 
 1. **Nenhum bucket S3 com dados de saúde fica público por mais de 5 minutos** sem alerta e remediação automática. Testado via drill mensal (Game Day).
 
@@ -354,7 +354,7 @@ O projeto Wayfinder Cloud será considerado bem-sucedido quando:
 
 5. **Relatórios semanais entregues** com 100% de cobertura dos artigos LGPD mapeados.
 
-6. **Custo AWS reduzido em  15%** em 6 meses com documentação de cada ação de otimização.
+6. **Cost AWS reduzido em  15%** em 6 meses com documentação de cada ação de otimização.
 
 7. **Todas as credenciais de banco armazenadas no Secrets Manager** com rotação automática habilitada.
 

@@ -1,8 +1,8 @@
 ﻿#  Guia de Publicação no GitHub  Wayfinder Cloud
 
 **Para:** Guilherme Barreto Gomes  
-**Objetivo:** Publicar o projeto em partes, de forma profissional, construindo  
-o histórico de commits como um arquiteto sênior faria num projeto real.
+**Objective:** Publicar o Project em partes, de forma profissional, construindo  
+o histórico de commits como um arquiteto sênior faria num Project real.
 
 ---
 
@@ -15,7 +15,7 @@ escolhas arquiteturais foram feitas com intenção, não jogadas de uma vez.
 Um histórico bem construído responde, sem você precisar explicar:
 - Por que Terraform e não CDK?
 - Por que event-driven e não polling?
-- Por que S3 Object Lock para auditoria?
+- Por que S3 Object Lock para Audit?
 
 ---
 
@@ -31,7 +31,7 @@ git commit -m "docs: add project scaffold and README
 
 Wayfinder Cloud  plataforma de governança cloud para saúde digital
 sob LGPD. Inclui README com pitch técnico, cenário VitaCore Health
-e arquitetura em alto nível."
+e Architecture em alto nível."
 ```
 
 **Commit 2  Cenário de negócio e documentação**
@@ -42,7 +42,7 @@ git commit -m "docs: add business context, LGPD mapping and architecture
 - VitaCore Health scenario: incidente de março 2026, impacto R$ 2.1M
 - LGPD controls mapping v2.0: arts. 5, 6, 11, 37, 46-50
 - Architecture overview: diagrama Mermaid completo, 35+ serviços AWS
-- Service catalog: justificativa técnica por serviço"
+- Service catalog: Justification técnica por serviço"
 ```
 
 **Commit 3  ADRs**
@@ -122,7 +122,7 @@ security:
 
 ---
 
-### Fase 3  Observabilidade e Remediação (commits 78)
+### Fase 3  Observability e Remediação (commits 78)
 
 **Commit 7  Módulo observability**
 ```bash
@@ -155,9 +155,9 @@ git commit -m "feat(infra): add remediation module
 
 ---
 
-### Fase 4  Ambientes e CI/CD (commits 911)
+### Fase 4  Environments e CI/CD (commits 911)
 
-**Commit 9  Ambiente dev**
+**Commit 9  Environment dev**
 ```bash
 git add infra/environments/dev/
 git commit -m "feat(env): add dev environment configuration
@@ -170,7 +170,7 @@ git commit -m "feat(env): add dev environment configuration
 - Force destroy enabled (dev only)"
 ```
 
-**Commit 10  Ambiente prod**
+**Commit 10  Environment prod**
 ```bash
 git add infra/environments/prod/
 git commit -m "feat(env): add prod environment configuration
@@ -293,10 +293,10 @@ Website: (deixar vazio por enquanto)
 
 Ao publicar cada fase, pode mencionar:
 
-- **Fase 1 (commits 1-3):** "Documentei o problema de negócio antes de escrever uma linha de código."
-- **Fase 2 (commits 4-6):** "IaC com Terraform: módulos de storage, IAM, rede e compliance."
-- **Fase 3 (commits 7-8):** "Pipeline de conformidade event-driven: Config  EventBridge  Lambda."
-- **Fase 4 (commits 9-11):** "Ambientes dev e prod com CI/CD completo e aprovação manual em prod."
+- **Fase 1 (commits 1-3):** "Documentei o Problem de negócio antes de escrever uma linha de código."
+- **Fase 2 (commits 4-6):** "IaC com Terraform: módulos de storage, IAM, Network e compliance."
+- **Fase 3 (commits 7-8):** "Pipeline de Compliance event-driven: Config  EventBridge  Lambda."
+- **Fase 4 (commits 9-11):** "Environments dev e prod com CI/CD completo e aprovação manual em prod."
 - **Fase 5 (commit 12):** "Código Python das Lambdas com testes unitários usando moto."
 
 ---

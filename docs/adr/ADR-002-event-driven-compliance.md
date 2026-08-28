@@ -1,97 +1,97 @@
-﻿# ADR-002  Arquitetura Event-Driven para Avaliação de Compliance
+﻿# ADR-002  Event-Driven Architecture for Compliance Evaluation
 
-**Status:** Aceito  
-**Data:** 2026-08-21  
-**Autor:** Guilherme Barreto Gomes  
-**Revisores:** 
-
----
-
-## Contexto
-
-O sistema de compliance precisa avaliar recursos AWS continuamente e reagir a
-desvios de conformidade sem polling ativo. Existem duas abordagens principais:
-
-1. **Polling periódico**  Lambda agendada que varre recursos periodicamente
-2. **Event-driven**  Config Rules + EventBridge reagem a mudanças em tempo real
-
-O contexto de saúde digital impõe requisito adicional: o tempo entre um desvio
-de conformidade ocorrer e a resposta (alerta + remediação) deve ser o menor
-possível para cumprir o espírito do art. 48 da LGPD (comunicação de incidentes).
+**Status:** Accepted
+**Date:** 2026-08-21
+**Author:** Guilherme Barreto Gomes
+**Reviewers:**
 
 ---
 
-## Decisão
+## Context
 
-**Arquitetura event-driven** usando AWS Config + EventBridge como backbone de eventos,
-com Lambda como executor de lógica de avaliação e remediação.
+The compliance system needs to evaluate AWS resources continuously and react to
+configuration deviations without active polling. There are two main approaches:
 
----
+1. **Periodic polling** - scheduled Lambda that scans resources periodically
+2. **Event-driven** - Config Rules + EventBridge react to changes in real time
 
-## Justificativa
-
-**Latência de detecção:**
-- Polling a cada 5 min: desvio pode existir por até 5 min antes de detectado
-- Event-driven (Config  EventBridge): detecção em segundos após a mudança de configuração
-
-**Custo:**
-- Lambda on-demand: cobrança apenas por execução real
-- Polling com Lambda a cada 5 min: ~8.640 execuções/mês mesmo sem eventos
-
-**Escalabilidade:**
-- EventBridge processa múltiplos eventos simultâneos sem gargalo
-- Regras de roteamento permitem encaminhar tipos diferentes de eventos para Lambdas específicas
-
-**Desacoplamento:**
-- AWS Config, EventBridge e Lambda são independentes
-- Falha em uma Lambda de remediação não impacta a detecção
-- Novos tipos de compliance podem ser adicionados criando nova Config Rule + EventBridge Rule
-  sem modificar componentes existentes (Open/Closed Principle)
+The digital health context adds an extra requirement: the time between a compliance
+deviation and the response (alert + remediation) must be as short as possible to
+comply with the spirit of LGPD Art. 48 (incident communication).
 
 ---
 
-## Fluxo Arquitetural Detalhado
+## Decision
+
+**Event-driven architecture** using AWS Config + EventBridge as the event backbone,
+with Lambda as the evaluation and remediation logic executor.
+
+---
+
+## Justification
+
+**Detection latency:**
+- Polling every 5 min: deviation can exist for up to 5 min before detection
+- Event-driven (Config to EventBridge): detection in seconds after the configuration change
+
+**Cost:**
+- Lambda on-demand: charged only for real executions
+- Polling with Lambda every 5 min: ~8,640 executions/month even without events
+
+**Scalability:**
+- EventBridge processes multiple simultaneous events without bottleneck
+- Routing rules allow sending different event types to specific Lambdas
+
+**Decoupling:**
+- AWS Config, EventBridge, and Lambda are independent
+- A failure in a remediation Lambda does not impact detection
+- New compliance types can be added by creating a new Config Rule + EventBridge Rule
+  without modifying existing components (Open/Closed Principle)
+
+---
+
+## Detailed Architectural Flow
 
 ```
-Recurso AWS modificado
-        
-        
-AWS Config detecta mudança de configuração
-        
-        
-Config Rule avalia: COMPLIANT ou NON_COMPLIANT
-        
-        
+AWS resource modified
+        |
+        v
+AWS Config detects configuration change
+        |
+        v
+Config Rule evaluates: COMPLIANT or NON_COMPLIANT
+        |
+        v
 EventBridge Rule (on Config Rule change)
-        
-         NON_COMPLIANT + CRITICAL  Lambda compliance-evaluator
-                                               
-                                                SNS Topic CRITICAL
-                                                Lambda auto-remediation
-        
-         NON_COMPLIANT + HIGH  Lambda compliance-evaluator
-                                               
-                                                SNS Topic WARNING
-        
-         COMPLIANT  CloudWatch metric (conformidade %)
+        |
+        +-- NON_COMPLIANT + CRITICAL --> Lambda compliance-evaluator
+        |                                           |
+        |                                           +--> SNS Topic CRITICAL
+        |                                           +--> Lambda auto-remediation
+        |
+        +-- NON_COMPLIANT + HIGH --> Lambda compliance-evaluator
+        |                                           |
+        |                                           +--> SNS Topic WARNING
+        |
+        +-- COMPLIANT --> CloudWatch metric (compliance %)
 ```
 
 ---
 
-## Trade-offs Aceitos
+## Trade-offs Accepted
 
-| Trade-off | Impacto | Mitigação |
+| Trade-off | Impact | Mitigation |
 |---|---|---|
-| Config tem delay de alguns segundos para detectar mudanças | Baixo  segundos, não minutos | Aceitável para o contexto |
-| EventBridge tem limite de 300 rules por event bus | Baixo  projeto usa ~20 rules | Monitorar conforme projeto escala |
-| Complexidade de debugar fluxo event-driven | Médio | X-Ray tracing em todas as Lambdas + CloudWatch Logs estruturados |
+| Config has a few seconds delay to detect changes | Low - seconds, not minutes | Acceptable for this context |
+| EventBridge has a limit of 300 rules per event bus | Low - project uses ~20 rules | Monitor as project scales |
+| Complexity of debugging event-driven flow | Medium | X-Ray tracing on all Lambdas + structured CloudWatch Logs |
 
 ---
 
-## Consequências
+## Consequences
 
-- Config DEVE ser habilitado em todas as regiões ativas com gravação de todos os recursos
-- EventBridge DEVE ter regras para cada tipo de violação classificada por severidade
-- Todas as Lambdas DEVEM ter X-Ray ativo para rastreabilidade do fluxo de eventos
-- Dead Letter Queues (SQS) DEVEM ser configuradas em todas as Lambdas para capturar falhas
-- CloudWatch DEVE ter métricas customizadas para conformidade (% recursos COMPLIANT)
+- Config MUST be enabled in all active regions with all-resources recording
+- EventBridge MUST have rules for each violation type classified by severity
+- All Lambdas MUST have X-Ray active for event flow traceability
+- Dead Letter Queues (SQS) MUST be configured on all Lambdas to capture failures
+- CloudWatch MUST have custom metrics for compliance (% COMPLIANT resources)

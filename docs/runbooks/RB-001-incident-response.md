@@ -1,16 +1,16 @@
 ﻿# Runbook RB-001  Resposta a Incidente de Segurança
 
-**Projeto:** Wayfinder Cloud  
+**Project:** Wayfinder Cloud  
 **Versão:** 1.0  
 **Classificação:** OPERACIONAL  
 **SLA de execução:** CRITICAL  15 min | HIGH  2h | MEDIUM  24h
 
 ---
 
-## Objetivo
+## Objective
 
 Documentar o procedimento de resposta a incidentes detectados pelo Wayfinder Cloud,
-garantindo conformidade com o art. 48 da LGPD (comunicação de incidentes em 72h).
+garantindo Compliance com o art. 48 da LGPD (comunicação de incidentes em 72h).
 
 ---
 
@@ -20,7 +20,7 @@ garantindo conformidade com o art. 48 da LGPD (comunicação de incidentes em 72
 |---|---|---|---|
 | CRITICAL | Dados de saúde expostos ou risco iminente de exposição | 15 min | Obrigatória se confirmado |
 | HIGH | Controle de segurança desabilitado, potencial exposição | 2h | Avaliar após investigação |
-| MEDIUM | Desvio de conformidade sem risco imediato | 24h | Normalmente não necessária |
+| MEDIUM | Desvio de Compliance sem risco imediato | 24h | Normalmente não necessária |
 | LOW | Drift de configuração de baixo risco | 72h | Não necessária |
 
 ---
@@ -32,7 +32,7 @@ O Wayfinder Cloud detecta e classifica automaticamente. Esta fase não requer in
 ```
 1. Config Rule avalia recurso  NON_COMPLIANT
 2. EventBridge recebe evento  roteia para compliance-evaluator
-3. Lambda enriquece evento com contexto e classifica severidade
+3. Lambda enriquece evento com Context e classifica severidade
 4. SNS notifica SecOps via email + Slack
 5. Se CRITICAL: Lambda auto-remediation executa ação segura
 ```
@@ -180,7 +180,7 @@ Deadline ANPD: [DATA + 72h]
    [descrição técnica]
 
 2. DADOS AFETADOS
-   Tipo: [prontuários / laudos / dados wearable]
+   Type: [prontuários / laudos / dados wearable]
    Volume estimado: [número de registros]
    Titulares afetados: [número estimado]
 
@@ -188,7 +188,7 @@ Deadline ANPD: [DATA + 72h]
    [lista de ações tomadas]
 
 4. AVALIAÇÃO DE RISCO AOS TITULARES
-   [alto / médio / baixo  justificativa]
+   [alto / médio / baixo  Justification]
 
 5. PRÓXIMOS PASSOS
    [ações planejadas]

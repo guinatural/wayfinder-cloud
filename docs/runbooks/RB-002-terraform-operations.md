@@ -1,12 +1,12 @@
 ﻿# Runbook RB-002  Operações Terraform
 
-**Projeto:** Wayfinder Cloud  
+**Project:** Wayfinder Cloud  
 **Versão:** 1.0  
 **Classificação:** OPERACIONAL
 
 ---
 
-## Pré-requisitos
+## Pré-Requirements
 
 | Ferramenta | Versão Mínima | Instalação |
 |---|---|---|
@@ -40,12 +40,12 @@ aws sso login --profile wayfinder-dev
 
 ## Bootstrap do Estado Remoto
 
-**Execute este passo UMA VEZ antes do primeiro `terraform apply`.**
+**Execute este Step UMA VEZ antes do primeiro `terraform apply`.**
 
 O estado Terraform é armazenado em S3 + DynamoDB. Esses recursos precisam existir antes
 do primeiro apply (não podem ser criados pelo próprio Terraform  chicken-and-egg).
 
-### Passo 1: Criar o bucket S3 de state
+### Step 1: Criar o bucket S3 de state
 
 ```bash
 # Para dev
@@ -75,7 +75,7 @@ aws s3api put-bucket-encryption \
   --profile wayfinder-dev
 ```
 
-### Passo 2: Criar tabela DynamoDB para lock
+### Step 2: Criar tabela DynamoDB para lock
 
 ```bash
 aws dynamodb create-table \
@@ -108,7 +108,7 @@ terraform init -upgrade
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
-# Edite com os valores do seu ambiente (alert_email, etc.)
+# Edite com os valores do seu Environment (alert_email, etc.)
 ```
 
 ### Verificar plano de mudanças (SEMPRE executar antes do apply)
@@ -133,7 +133,7 @@ terraform apply tfplan.binary
 terraform apply
 ```
 
-### Destruir ambiente (APENAS dev)
+### Destruir Environment (APENAS dev)
 
 ```bash
 # Nunca executar em prod  destruição irreversível
@@ -147,7 +147,7 @@ terraform destroy
 ### 1. Decidir: Managed ou Custom?
 
 - **Managed**: Use se a AWS já tem um `source_identifier` pronto (ex: `S3_BUCKET_MFA_DELETE_ENABLED`)
-- **Custom**: Use para regras específicas do negócio (ex: verificar tag `data-classification`)
+- **Custom**: Use para Rules específicas do negócio (ex: verificar tag `data-classification`)
 
 ### 2. Adicionar ao módulo compliance
 
@@ -157,7 +157,7 @@ Edite `infra/modules/compliance/main.tf`:
 ```hcl
 locals {
   managed_rules = {
-    # ... regras existentes ...
+    # ... Rules existentes ...
     s3_mfa_delete = {
       source_identifier = "S3_BUCKET_MFA_DELETE_ENABLED"
       description       = "Verifica se S3 tem MFA Delete habilitado"
@@ -170,7 +170,7 @@ locals {
 ```hcl
 locals {
   custom_rules = {
-    # ... regras existentes ...
+    # ... Rules existentes ...
     "WAYFINDER-007" = {
       description = "LGPD Art.XX  Descrição da nova violação"
     }
@@ -184,7 +184,7 @@ Edite `src/lambdas/compliance-evaluator/handler.py`:
 ```python
 RULE_LGPD_MAP["WAYFINDER-007"] = {
     "article": "Art. XX",
-    "description": "Descrição técnica da regra",
+    "description": "Descrição técnica da Rule",
     "severity": "HIGH",
     "auto_remediation": False,
     "remediation_action": None,
@@ -193,7 +193,7 @@ RULE_LGPD_MAP["WAYFINDER-007"] = {
 
 ### 4. Criar ADR se necessário
 
-Para regras que implicam decisões arquiteturais, crie um ADR em `docs/adr/`.
+Para Rules que implicam decisões arquiteturais, crie um ADR em `docs/adr/`.
 
 ### 5. Testar e aplicar
 

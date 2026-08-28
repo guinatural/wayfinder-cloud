@@ -1,75 +1,75 @@
-﻿# ADR-001  Escolha do Terraform como ferramenta de IaC
+﻿# ADR-001  Choosing Terraform as the IaC Tool
 
-**Status:** Aceito  
-**Data:** 2026-08-21  
-**Autor:** Guilherme Barreto Gomes  
-**Revisores:** 
-
----
-
-## Contexto
-
-O projeto Wayfinder Cloud precisa provisionar e gerenciar ~15 tipos de recursos AWS
-de forma reproduzível, versionada e auditável. A infraestrutura precisa ser
-consistente entre os ambientes `dev` e `prod` e deve ser modificável por qualquer
-membro técnico da equipe sem necessidade de acesso direto ao console AWS.
-
-As opções avaliadas foram:
-
-1. **Terraform (HashiCorp)**  IaC declarativo, multi-cloud, HCL
-2. **AWS CDK (Python)**  IaC imperativo, AWS-native, Python/TypeScript
-3. **AWS CloudFormation**  IaC declarativo nativo AWS, YAML/JSON
-4. **Pulumi**  IaC imperativo, multi-cloud, Python
+**Status:** Accepted
+**Date:** 2026-08-21
+**Author:** Guilherme Barreto Gomes
+**Reviewers:**
 
 ---
 
-## Decisão
+## Context
 
-**Terraform** foi escolhido como ferramenta principal de IaC.
+The Wayfinder Cloud project needs to provision and manage ~15 types of AWS resources
+in a reproducible, versioned, and auditable way. The infrastructure must be
+consistent across `dev` and `prod` environments and must be modifiable by any
+technical team member without needing direct console access.
 
----
+Options evaluated:
 
-## Justificativa
-
-**Em favor do Terraform:**
-
-- Maior adoção no mercado de trabalho PJ/CLT  aparece em ~70% das vagas de Cloud/DevOps
-- Ecossistema maduro com Registry de módulos públicos verificados
-- State management explícito (remote state no S3 + DynamoDB lock) torna o estado da infra auditável
-- Separação clara entre módulos reutilizáveis e configurações de ambiente
-- Provider AWS atualizado frequentemente pela HashiCorp e comunidade
-- Permite import de recursos existentes criados manualmente (`terraform import`)
-- Plan/Apply separados permitem revisão de mudanças antes da aplicação
-
-**Contra AWS CDK:**
-CDK seria mais natural dado o background Python, mas gera CloudFormation internamente,
-adicionando uma camada de abstração que dificulta debugging em entrevistas técnicas.
-Além disso, CDK requer Node.js mesmo para projetos Python, adicionando dependência.
-
-**Contra CloudFormation:**
-YAML verboso dificulta reutilização modular. Não tem suporte a outros providers,
-limitando portabilidade de conhecimento. Menos valorizado em vagas que não são AWS-only.
-
-**Contra Pulumi:**
-Ecossistema menor, menor adoção no mercado brasileiro. Custo adicional para features
-de state management em times.
+1. **Terraform (HashiCorp)** - declarative IaC, multi-cloud, HCL
+2. **AWS CDK (Python)** - imperative IaC, AWS-native, Python/TypeScript
+3. **AWS CloudFormation** - declarative native AWS IaC, YAML/JSON
+4. **Pulumi** - imperative IaC, multi-cloud, Python
 
 ---
 
-## Trade-offs Aceitos
+## Decision
 
-| Trade-off | Impacto | Mitigação |
+**Terraform** was chosen as the primary IaC tool.
+
+---
+
+## Justification
+
+**In favor of Terraform:**
+
+- Highest market adoption - appears in ~70% of Cloud/DevOps job listings
+- Mature ecosystem with verified public module registry
+- Explicit state management (remote state on S3 + DynamoDB lock) makes infra state auditable
+- Clear separation between reusable modules and environment configurations
+- AWS provider updated frequently by HashiCorp and community
+- Supports importing existing manually created resources (`terraform import`)
+- Separate Plan/Apply steps allow reviewing changes before applying
+
+**Against AWS CDK:**
+CDK would be more natural given the Python background, but it generates CloudFormation
+internally, adding an abstraction layer that complicates debugging in technical interviews.
+CDK also requires Node.js even for Python projects, adding a dependency.
+
+**Against CloudFormation:**
+Verbose YAML makes modular reuse harder. No support for other providers,
+limiting knowledge portability. Less valued in jobs that are not AWS-only.
+
+**Against Pulumi:**
+Smaller ecosystem, lower adoption in the market. Additional cost for state management
+features in teams.
+
+---
+
+## Trade-offs Accepted
+
+| Trade-off | Impact | Mitigation |
 |---|---|---|
-| HCL é uma linguagem a aprender | Baixo  sintaxe simples | Documentação excelente, curva rápida |
-| State file precisa de backend remoto | Médio  configuração inicial | Módulo `storage` cria S3 + DynamoDB para state |
-| Não é AWS-native | Baixo para este projeto | Projeto é AWS-only, sem necessidade multi-cloud |
+| HCL is a language to learn | Low - simple syntax | Excellent documentation, fast learning curve |
+| State file needs a remote backend | Medium - initial setup | `storage` module creates S3 + DynamoDB for state |
+| Not AWS-native | Low for this project | Project is AWS-only, no multi-cloud need |
 
 ---
 
-## Consequências
+## Consequences
 
-- Todos os recursos AWS do projeto DEVEM ser criados via Terraform
-- Recursos criados manualmente no console DEVEM ser importados ou destruídos
-- O estado Terraform DEVE ser armazenado remotamente (S3 + DynamoDB)
-- Mudanças de infraestrutura DEVEM passar por `terraform plan` no CI/CD antes de `apply`
-- Módulos reutilizáveis DEVEM ser documentados com `variables.tf` e `outputs.tf` completos
+- All AWS resources in the project MUST be created via Terraform
+- Resources created manually in the console MUST be imported or destroyed
+- Terraform state MUST be stored remotely (S3 + DynamoDB)
+- Infrastructure changes MUST go through `terraform plan` in CI/CD before `apply`
+- Reusable modules MUST be documented with complete `variables.tf` and `outputs.tf`

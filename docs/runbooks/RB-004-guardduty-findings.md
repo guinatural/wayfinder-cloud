@@ -11,7 +11,7 @@
 ## 1. Visão Geral
 
 Este runbook documenta os procedimentos de resposta a findings do Amazon GuardDuty
-no contexto da VitaCore Health. Dado o volume e sensibilidade dos dados processados
+no Context da VitaCore Health. Dado o volume e sensibilidade dos dados processados
 (127.000 pacientes, dados classificados como health-critical), findings de segurança
 devem ser tratados com urgência máxima.
 
@@ -24,7 +24,7 @@ devem ser tratados com urgência máxima.
 
 ---
 
-## 2. Finding Types Mais Comuns  Ambiente de Saúde Digital
+## 2. Finding Types Mais Comuns  Environment de Saúde Digital
 
 ### 2.1 Mapa de Finding Types por Família
 
@@ -54,24 +54,24 @@ devem ser tratados com urgência máxima.
 **Aplicável a:** Recon:EC2/PortProbing, Recon:EC2/Portscan
 
 ```
-PASSO 1  Identificar recurso alvo
+Step 1  Identificar recurso alvo
    Console GuardDuty  Finding details  Resource affected
    Anote: instance ID, IP público, Security Groups
 
-PASSO 2  Verificar se EC2 é legítima
+Step 2  Verificar se EC2 é legítima
    SSM Session Manager: aws ssm start-session --target <instance-id>
    Verifique tags: deve ter Environment, Project, Owner
    Se EC2 não tem tags  possivelmente recurso órfão  ESCALAR para CTO
 
-PASSO 3  Verificar VPC Flow Logs
+Step 3  Verificar VPC Flow Logs
    Athena query (ver seção 5.1)
    Identifique quais portas foram sondadas
    Se porta 3306, 5432, 6379  dados de banco acessados?  ESCALAR
 
-PASSO 4  Ação
+Step 4  Ação
    Se EC2 em subnet pública COM dados de saúde  ativar WAYFINDER-006 manualmente
    Se reconhecimento externo sem acesso bem-sucedido  registrar + monitorar
-   Atualizar Security Groups: remover regras desnecessárias (WAYFINDER-009)
+   Atualizar Security Groups: remover Rules desnecessárias (WAYFINDER-009)
    Timeout de 24h sem incidente adicional  resolver finding
 
 SEVERIDADE WAYFINDER: MEDIUM (sem acesso confirmado) / HIGH (se porta DB sondada)
@@ -83,32 +83,32 @@ SEVERIDADE WAYFINDER: MEDIUM (sem acesso confirmado) / HIGH (se porta DB sondada
 
 ```
 CASO A: SSHBruteForce
-PASSO 1  Verificar se porta 22 está aberta publicamente
+Step 1  Verificar se porta 22 está aberta publicamente
    aws ec2 describe-security-groups --group-ids <sg-id>
    Se yes  auto-remediation WAYFINDER-009 deve ter fechado  confirmar
    Se ainda aberta  fechar IMEDIATAMENTE via CLI
 
-PASSO 2  Verificar acessos bem-sucedidos
+Step 2  Verificar acessos bem-sucedidos
    Athena query 5.2: login bem-sucedido nas últimas 4h no instance?
    Se sim  INCIDENTE DE SEGURANÇA  seguir RB-001
 
 CASO B: IAMUser/ConsoleLoginSuccess de IP suspeito
-PASSO 1  CRÍTICO  Revogar sessões ativas imediatamente
+Step 1  CRÍTICO  Revogar sessões ativas imediatamente
    aws iam delete-user-login-profile --user-name <user>
    Ou: aws cognito-idp admin-user-global-sign-out (se via Identity Center)
 
-PASSO 2  Revogar credenciais
+Step 2  Revogar credenciais
    aws iam deactivate-mfa-device (se MFA comprometido)
    aws iam delete-access-key --access-key-id <key>
    Forçar reset de senha
 
-PASSO 3  Investigar ações realizadas
+Step 3  Investigar ações realizadas
    Athena query 5.3: todas as ações do usuário nas últimas 24h
    Escopo da comprometimento: quais recursos foram acessados?
    Se dados de saúde acessados  INCIDENTE LGPD  notificar DPO
 
 CASO C: S3/MaliciousIPCaller (exatamente o incidente de março)
-PASSO 1  VERIFICAR SE BUCKET ESTÁ PÚBLICO (15 minutos)
+Step 1  VERIFICAR SE BUCKET ESTÁ PÚBLICO (15 minutos)
    aws s3api get-public-access-block --bucket <bucket-name>
    Se todos false  INCIDENTE LGPD em andamento
    WAYFINDER-002 deve ter remediado  se não  remediar manualmente:
@@ -116,12 +116,12 @@ PASSO 1  VERIFICAR SE BUCKET ESTÁ PÚBLICO (15 minutos)
       --public-access-block-configuration \
       "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 
-PASSO 2  Identificar dados acessados
+Step 2  Identificar dados acessados
    CloudTrail S3 data events: quais objetos foram GET?
    Athena query 5.4: objetos acessados com classificação health-*
    Conta objetos únicos + pacientes afetados
 
-PASSO 3  Notificação LGPD
+Step 3  Notificação LGPD
    Se dados de saúde acessados por IP externo  INCIDENTE LGPD
    Notificar DPO Ana Lima IMEDIATAMENTE (< 15 min)
    DPO inicia processo art. 48 (72h para ANPD)
@@ -135,27 +135,27 @@ SEVERIDADE WAYFINDER: CRITICAL para S3 e IAMUser/Console
 **Aplicável a:** Trojan:EC2/BlackholeTraffic, Trojan:EC2/DropPoint
 
 ```
-PASSO 1  ISOLAMENTO IMEDIATO da instância
+Step 1  ISOLAMENTO IMEDIATO da instância
    aws ec2 create-security-group --description "QUARANTINE-$(date +%Y%m%d)" ...
    aws ec2 modify-instance-attribute --instance-id <id> --groups <quarantine-sg>
    A instância fica sem ingress/egress (quarentena total)
 
-PASSO 2  Snapshot forense antes de qualquer ação destrutiva
+Step 2  Snapshot forense antes de qualquer ação destrutiva
    aws ec2 create-snapshot --volume-id <volume-id> \
       --description "ForensicSnapshot-$(date +%Y%m%d-%H%M)"
    Registrar snapshot ID no ticket de incidente
 
-PASSO 3  Análise de tráfego suspeito
+Step 3  Análise de tráfego suspeito
    Athena query 5.5: VPC Flow Logs da instância nas últimas 24h
    Identifique IPs de C&C (Command and Control)
    Verifique se instância tem acesso a Aurora/DynamoDB
 
-PASSO 4  Escalar para análise forense
+Step 4  Escalar para análise forense
    Engajar consultoria de forense digital (se disponível)
    AWS Security IR Team (suporte Premium) se necessário
    NÃO fazer login na instância  pode contaminar evidências
 
-PASSO 5  Criar nova instância limpa (se necessário)
+Step 5  Criar nova instância limpa (se necessário)
    Deploy via GitHub Actions com imagem ECR nova
    Terminar instância comprometida após análise forense
 
@@ -167,29 +167,29 @@ SEVERIDADE WAYFINDER: HIGH  CRITICAL se dados acessados
 **Aplicável a:** CryptoCurrency:EC2/BitcoinTool.B
 
 ```
-PASSO 1  Verificar uso de CPU (indicador principal)
+Step 1  Verificar uso de CPU (indicador principal)
    aws cloudwatch get-metric-statistics --namespace AWS/EC2 \
       --metric-name CPUUtilization --statistics Maximum \
       --dimensions Name=InstanceId,Value=<id>
    Se CPU > 90% consistente  forte indicação de mineração
 
-PASSO 2  Identificar processo responsável (via SSM)
+Step 2  Identificar processo responsável (via SSM)
    aws ssm send-command --instance-ids <id> \
       --document-name AWS-RunShellScript \
       --parameters commands='["ps aux --sort=-%cpu | head -20"]'
    Procure por processos desconhecidos (xmrig, minergate, etc.)
 
-PASSO 3  Verificar vetor de comprometimento
+Step 3  Verificar vetor de comprometimento
    Athena query 5.6: como o processo foi iniciado? (SSM history, SSH logs)
    Identificar vulnerabilidade explorada (Inspector findings pendentes?)
 
-PASSO 4  Remediar
+Step 4  Remediar
    Se ECS Fargate: force new deployment (mata task comprometida)
    Se EC2: seguir procedimento Trojan (isolamento + snapshot + nova instância)
    Abrir ticket de segurança com Inspector finding associado
 
-IMPACTO FINANCEIRO: Mineração pode inflar custo AWS em 200-400%
-NOTIFICAR: CTO (custo) + SecOps (segurança)
+IMPACTO FINANCEIRO: Mineração pode inflar Cost AWS em 200-400%
+NOTIFICAR: CTO (Cost) + SecOps (segurança)
 SEVERIDADE WAYFINDER: MEDIUM (sem acesso a dados) / HIGH (se comprometido há > 24h)
 ```
 
@@ -200,25 +200,25 @@ SEVERIDADE WAYFINDER: MEDIUM (sem acesso a dados) / HIGH (se comprometido há > 
 ```
 ATENÇÃO: Este é o finding mais grave  indica comprometimento persistente.
 
-PASSO 1  ISOLAMENTO IMEDIATO (< 5 minutos)
-   Seguir procedimento de isolamento do Trojan PASSO 1
+Step 1  ISOLAMENTO IMEDIATO (< 5 minutos)
+   Seguir procedimento de isolamento do Trojan Step 1
 
-PASSO 2  NOTIFICAÇÃO IMEDIATA
+Step 2  NOTIFICAÇÃO IMEDIATA
    Ligar para CTO Rafael Santos (não apenas email)
    Notificar DPO Ana Lima (possível exfiltração de dados)
    Considerar envolver AWS Security IR (via AWS Support)
 
-PASSO 3  PRESERVAÇÃO DE EVIDÊNCIAS
+Step 3  PRESERVAÇÃO DE EVIDÊNCIAS
    Snapshot de todos os volumes da instância
    Exportar VPC Flow Logs, CloudTrail e GuardDuty findings para S3 imutável
    NÃO reiniciar ou modificar a instância
 
-PASSO 4  AVALIAÇÃO DE ESCOPO
+Step 4  AVALIAÇÃO DE ESCOPO
    Athena query 5.3: todas as ações realizadas pela instância nas últimas 72h
    Quais dados foram acessados? Há exfiltração confirmada?
    Há outros recursos comprometidos? (lateral movement)
 
-PASSO 5  Se dados de saúde exfiltrados  INCIDENTE LGPD
+Step 5  Se dados de saúde exfiltrados  INCIDENTE LGPD
    Acionar RB-001 completo
    DPO inicia processo de notificação ANPD (art. 48)
    CEO deve ser informado diretamente
@@ -252,7 +252,7 @@ Campos do GuardDuty Finding relevantes para correlação:
   - finding.service.eventFirstSeen / eventLastSeen  janela temporal do CloudTrail
   - finding.service.remoteIpDetails.ipAddressV4  filtrar no CloudTrail por sourceIPAddress
   - finding.service.action.awsApiCallAction.api  API específica chamada
-  - finding.accountId + finding.region  contexto do CloudTrail
+  - finding.accountId + finding.region  Context do CloudTrail
 ```
 
 ---
@@ -320,7 +320,7 @@ ORDER BY eventtime DESC;
 ### 5.4 S3 Data Events  Objetos Acessados (Incidente de Exposição)
 
 ```sql
--- Query 5.4: Objetos S3 acessados por IPs externos (contexto do incidente de março)
+-- Query 5.4: Objetos S3 acessados por IPs externos (Context do incidente de março)
 SELECT
   eventtime,
   eventname,

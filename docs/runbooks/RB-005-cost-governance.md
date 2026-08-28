@@ -1,4 +1,4 @@
-﻿# RB-005  Governança de Custo AWS
+﻿# RB-005  Governança de Cost AWS
 
 **Runbook:** RB-005 | **Versão:** 1.0  
 **Responsável primário:** Rafael Santos (CTO)  
@@ -8,16 +8,16 @@
 
 ---
 
-## 1. Contexto e Motivação
+## 1. Context e Motivação
 
-O custo AWS da VitaCore cresceu **23% ao mês** nos últimos 4 meses sem explicação
-clara, passando de R$ 15k/mês para R$ 47k/mês. A ausência de tags de custo
+O Cost AWS da VitaCore cresceu **23% ao mês** nos últimos 4 meses sem explicação
+clara, passando de R$ 15k/mês para R$ 47k/mês. A ausência de tags de Cost
 padronizadas impede identificar qual produto ou equipe é responsável.
 
 Estimativa: **30% dos recursos são ociosos ou superdimensionados**, representando
 ~R$ 14k/mês em desperdício que este runbook visa identificar e eliminar.
 
-**Meta:** Reduzir custo AWS em 15% em 6 meses (de ~$1.050/mês para ~$890/mês USD).
+**Meta:** Reduzir Cost AWS em 15% em 6 meses (de ~$1.050/mês para ~$890/mês USD).
 
 ---
 
@@ -26,7 +26,7 @@ Estimativa: **30% dos recursos são ociosos ou superdimensionados**, representan
 Todos os recursos AWS da VitaCore DEVEM ter as 5 tags abaixo. A ausência de qualquer
 uma delas é detectada pela Config Rule **WAYFINDER-015**.
 
-| Tag | Valores Permitidos | Obrigatória | Exemplo |
+| Tag | Valores Permitidos | Obrigatória | Example |
 |---|---|---|---|
 | `Environment` | `dev`, `staging`, `prod` |  Sim | `prod` |
 | `Project` | `vitacore-pep`, `vitacore-patient-app`, `vitacore-telehealth`, `vitacore-wearables`, `wayfinder-cloud`, `shared` |  Sim | `vitacore-pep` |
@@ -36,7 +36,7 @@ uma delas é detectada pela Config Rule **WAYFINDER-015**.
 
 **Tags adicionais recomendadas:**
 
-| Tag | Propósito | Exemplo |
+| Tag | Propósito | Example |
 |---|---|---|
 | `retention-required` | Ativa WAYFINDER-013 | `true` |
 | `retention-days` | Define período de Object Lock | `7305` |
@@ -50,7 +50,7 @@ uma delas é detectada pela Config Rule **WAYFINDER-015**.
 
 ```
 ID:            WAYFINDER-015
-Tipo:          CUSTOM_LAMBDA
+Type:          CUSTOM_LAMBDA
 Trigger:       Periódico (a cada 6h) + ConfigurationItemChangeNotification
 Avaliação:     Todos os recursos suportados DEVEM ter as 5 tags obrigatórias.
                Recursos no namespace arn:aws:iam::*/root são isentos.
@@ -58,53 +58,53 @@ Avaliação:     Todos os recursos suportados DEVEM ter as 5 tags obrigatórias.
 Não-conforme:  Severidade MEDIUM (< 7 dias sem tags)  HIGH (> 7 dias)
 Remediação:    Notificação para Owner identificado via CloudTrail (quem criou?)
                + ticket Jira automático com lista de tags ausentes
-LGPD:          Não aplicável diretamente  governança de custo e rastreabilidade
+LGPD:          Não aplicável diretamente  governança de Cost e rastreabilidade
 ISO 27001:     A.8.1  Inventário de ativos
 ```
 
 ---
 
-## 4. Processo de Análise de Custo Semanal
+## 4. Processo de Análise de Cost Semanal
 
 ### 4.1 Cadência
 
 | Evento | Quando | Responsável | Output |
 |---|---|---|---|
 | Coleta automática de dados | Toda segunda-feira 09h UTC | Lambda audit-reporter | Relatório JSON no S3 |
-| Revisão de custo semanal | Toda terça-feira 14h | CTO + Dev Lead | Decisões de rightsizing |
-| Análise de tendência mensal | Primeiro dia útil do mês | CTO + DPO (custo compliance) | Relatório para Board |
+| Revisão de Cost semanal | Toda terça-feira 14h | CTO + Dev Lead | Decisões de rightsizing |
+| Análise de tendência mensal | Primeiro dia útil do mês | CTO + DPO (Cost compliance) | Relatório para Board |
 
 ### 4.2 Passos da Revisão Semanal
 
 ```
-PASSO 1  Abrir Cost Explorer
+Step 1  Abrir Cost Explorer
    Console AWS  Cost Management  Cost Explorer
    Período: últimos 7 dias comparado com 7 dias anteriores
    Agrupamento: por Tag (Project) + por Serviço
 
-PASSO 2  Identificar variações > 10%
+Step 2  Identificar variações > 10%
    Serviço com crescimento > 10% sem mudança de usage esperada = investigar
    Executar Athena Query 6.1 para identificar recursos sem tag
 
-PASSO 3  Verificar instâncias ociosas
+Step 3  Verificar instâncias ociosas
    CloudWatch: CPU < 5% por mais de 7 dias = candidato a rightsizing
    Executar Athena Query 6.2 para EC2/RDS subutilizados
 
-PASSO 4  Revisar alarmes de Budget
-   Budget #1: custo total  se > 80%  análise imediata
+Step 4  Revisar alarmes de Budget
+   Budget #1: Cost total  se > 80%  análise imediata
    Budget #2: EC2+RDS  se > 70%  revisar rightsizing
 
-PASSO 5  Documentar ações
-   Criar ticket Jira tipo "Cost Optimization" para cada ação identificada
-   Registrar economia estimada vs custo atual
+Step 5  Documentar ações
+   Criar ticket Jira Type "Cost Optimization" para cada ação identificada
+   Registrar economia estimada vs Cost atual
    Atribuir ao Owner da tag do recurso
 ```
 
 ---
 
-## 5. Queries Athena para Análise de Custo
+## 5. Queries Athena para Análise de Cost
 
-**Nota:** Queries de custo usam o Cost and Usage Report (CUR) exportado para S3.
+**Nota:** Queries de Cost usam o Cost and Usage Report (CUR) exportado para S3.
 Configurar export em Billing  Cost & Usage Reports  S3 bucket `vitacore-cur-data`.
 
 ### 6.1 Recursos sem Tags Obrigatórias
@@ -154,10 +154,10 @@ HAVING AVG(value) < 10  -- média < 10% CPU em 7 dias
 ORDER BY avg_cpu_7d ASC;
 ```
 
-### 6.3 Custo por Projeto (via CUR)
+### 6.3 Cost por Project (via CUR)
 
 ```sql
--- Query 6.3: Custo semanal por Project tag e serviço
+-- Query 6.3: Cost semanal por Project tag e serviço
 SELECT
   resource_tags_user_project as project,
   line_item_product_code as aws_service,
@@ -171,10 +171,10 @@ ORDER BY total_cost_usd DESC
 LIMIT 50;
 ```
 
-### 6.4 NAT Gateway  Maior Custo de Rede
+### 6.4 NAT Gateway  Maior Cost de Network
 
 ```sql
--- Query 6.4: Detalhamento de custo NAT Gateway (frequentemente o maior item)
+-- Query 6.4: Detalhamento de Cost NAT Gateway (frequentemente o maior item)
 SELECT
   DATE_FORMAT(line_item_usage_start_date, '%Y-%m-%d') as date,
   line_item_resource_id as nat_gateway_id,
@@ -188,10 +188,10 @@ WHERE line_item_product_code = 'AmazonVPC'
 ORDER BY cost_usd DESC;
 ```
 
-### 6.5 S3 por Bucket  Identificar Buckets com Alto Custo
+### 6.5 S3 por Bucket  Identificar Buckets com Alto Cost
 
 ```sql
--- Query 6.5: Custo S3 por bucket (storage + requests + transfer)
+-- Query 6.5: Cost S3 por bucket (storage + requests + transfer)
 SELECT
   line_item_resource_id as bucket_arn,
   SUM(CASE WHEN line_item_usage_type LIKE '%Storage%' THEN line_item_unblended_cost ELSE 0 END) as storage_cost,
@@ -212,12 +212,12 @@ ORDER BY total_cost DESC;
 ### 6.1 Configuração dos Budgets
 
 ```hcl
-# Budget #1  Custo total mensal
+# Budget #1  Cost total mensal
 Budget: vitacore-monthly-total
 Limite: $1.050/mês (prod) / $150/mês (dev)
 Alertas:
   - 80% do limite  SNS WARNING  email CTO + Slack #eng-alerts
-    Mensagem: "Custo AWS atingiu 80% do budget. Ação preventiva necessária."
+    Mensagem: "Cost AWS atingiu 80% do budget. Ação preventiva necessária."
   - 100% do limite  SNS CRITICAL  email CTO + PagerDuty
     Mensagem: "Budget AWS EXCEDIDO. Investigar imediatamente."
   - 120% (forecast)  SNS WARNING (projeção de estouro)
@@ -227,7 +227,7 @@ Budget: vitacore-compute-database
 Limite: $550/mês (EC2 + RDS + ElastiCache)
 Alertas:
   - 70%  SNS WARNING  email CTO
-    "Custo de compute/database em 70% do budget. Revisar rightsizing."
+    "Cost de compute/database em 70% do budget. Revisar rightsizing."
 ```
 
 ### 6.2 Fluxo de Resposta a Alertas de Budget
@@ -236,7 +236,7 @@ Alertas:
 ALERT: Budget WARNING (80%)
     
      CTO revisa Cost Explorer (ver seção 4.2)
-     Identifica 3 maiores centros de custo da semana
+     Identifica 3 maiores centros de Cost da semana
      Verifica se há instâncias ociosas (Athena Query 6.2)
      Cria tickets de rightsizing se aplicável
 
@@ -277,7 +277,7 @@ ALERT: Budget CRITICAL (100%)
     Criar PR no repositório IaC com mudança de instance type
     Dev Lead + CTO aprovam antes de aplicar em prod
 
-4. Aplicação e monitoramento:
+4. Aplicação e Monitoring:
     Apply em dev primeiro (1 semana de observação)
     Apply em prod com janela de manutenção agendada
     CloudWatch Alarm: se P99 CPU > 80% após rightsizing  rollback automático
@@ -285,7 +285,7 @@ ALERT: Budget CRITICAL (100%)
 
 ### 7.2 Tabela de Rightsizing Comum
 
-| Tipo | Instância Atual | Proposta (menor carga) | Economia Estimada |
+| Type | Instância Atual | Proposta (menor carga) | Economia Estimada |
 |---|---|---|---|
 | EC2 app | c5.xlarge (4vCPU/8GB) | c5.large (2vCPU/4GB) | ~$60/mês |
 | RDS dev | db.r6g.large (2vCPU/16GB) | db.t4g.medium (2vCPU/4GB) | ~$75/mês |
@@ -294,12 +294,12 @@ ALERT: Budget CRITICAL (100%)
 
 ---
 
-## 8. Lifecycle Policies por Tipo de Dado
+## 8. Lifecycle Policies por Type de Dado
 
 S3 lifecycle policies automatizam a movimentação de dados para camadas de storage
-mais baratas, reduzindo custo sem afetar disponibilidade para dados ativos.
+mais baratas, reduzindo Cost sem afetar disponibilidade para dados ativos.
 
-| Tipo de Dado | Tag | Classificação | Hot (S3 Standard) | Warm (S3 IA) | Cold (Glacier IR) | Expiração |
+| Type de Dado | Tag | Classificação | Hot (S3 Standard) | Warm (S3 IA) | Cold (Glacier IR) | Expiração |
 |---|---|---|---|---|---|---|
 | Prontuários ativos | health-critical | Paciente ativo | Indefinido | Após inatividade 1 ano | Nunca (Object Lock 20 anos) | Não |
 | Laudos de imagem | health-critical | Após exame | 90 dias | 90-365 dias | 365d-5 anos | Object Lock 5 anos |

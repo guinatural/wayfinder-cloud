@@ -1,37 +1,37 @@
-﻿# Arquitetura  Wayfinder Cloud
+﻿# Architecture - Wayfinder Cloud
 
-**Versão:** 2.0 | **Data:** 2026-08-21  
-**Responsável:** Rafael Santos (CTO) + Equipe de Arquitetura  
-**Status:** Aprovado  Produção
+**Version:** 2.0 | **Date:** 2026-08-21
+**Owner:** Rafael Santos (CTO) + Architecture Team
+**Status:** Approved - Production
 
 ---
 
-## 1. Diagrama Completo de Serviços (Mermaid)
+## 1. Full Service Diagram (Mermaid)
 
 ```mermaid
 graph TB
-    subgraph External["Usuários e Sistemas Externos"]
-        DOC[Médico\nbrowser/app]
-        PAT[Paciente\napp iOS/Android]
-        LAB[Laboratório\nAPI REST]
+    subgraph External["External Users and Systems"]
+        DOC[Doctor\nbrowser/app]
+        PAT[Patient\niOS/Android app]
+        LAB[Laboratory\nREST API]
         WEAR[Wearable\nGarmin/Apple/Fitbit]
-        OPS[Operadora\nde Plano]
+        OPS[Health Plan\nOperator]
     end
 
-    subgraph CDN["Borda  Entrega e Proteção"]
+    subgraph CDN["Edge - Delivery and Protection"]
         R53[Route 53\nDNS + Health Checks]
         CF[CloudFront\nCDN + Cache]
         WAF[AWS WAF\nOWASP Top 10]
         ACM[ACM\nTLS Certificates]
     end
 
-    subgraph Auth["Autenticação e Identidade"]
+    subgraph Auth["Authentication and Identity"]
         COGNITO[Amazon Cognito\nUser Pools + Identity Pools]
-        IAM_IC[IAM Identity Center\nSSO Humanos]
+        IAM_IC[IAM Identity Center\nHuman SSO]
         IAM[AWS IAM\nRoles + Policies + SCPs]
     end
 
-    subgraph AppPlane["Plano de Aplicação  VPC 10.0.0.0/16"]
+    subgraph AppPlane["Application Plane - VPC 10.0.0.0/16"]
         ALB[Application\nLoad Balancer]
         ECS[ECS Fargate\nVitaCore API]
         KINESIS[Kinesis Data Streams\nwearable ingest]
@@ -39,19 +39,19 @@ graph TB
         ECR[Amazon ECR\nDocker images]
     end
 
-    subgraph DataPlane["Plano de Dados  Subnets Privadas"]
+    subgraph DataPlane["Data Plane - Private Subnets"]
         AURORA[Aurora MySQL\n3 clusters Multi-AZ]
-        REDIS[ElastiCache Redis\ncache + sessões]
+        REDIS[ElastiCache Redis\ncache + sessions]
         DYNAMO[DynamoDB\nwearable data + guardrails]
         S3H[S3 Health Buckets\nObject Lock COMPLIANCE]
     end
 
-    subgraph SecretsMgmt["Gestão de Segredos"]
-        SM[Secrets Manager\ncredenciais DB + API keys]
+    subgraph SecretsMgmt["Secrets Management"]
+        SM[Secrets Manager\nDB credentials + API keys]
         SSM[Systems Manager\nParameter Store]
     end
 
-    subgraph CompliancePlane["Plano de Conformidade  Wayfinder Core"]
+    subgraph CompliancePlane["Compliance Plane - Wayfinder Core"]
         CONFIG[AWS Config\nRecorder + 24 Rules]
         SECHUB[Security Hub\nFSBP + CIS 1.4]
         GD[GuardDuty\nML threat detection]
@@ -59,45 +59,45 @@ graph TB
         CT[CloudTrail\nAll Regions + Data Events]
     end
 
-    subgraph EventPlane["Orquestração de Eventos"]
+    subgraph EventPlane["Event Orchestration"]
         EB[EventBridge\nwayfinder-events bus]
-        EB_SCH[EventBridge Scheduler\nrelatórios semanais]
-        SQS[SQS DLQ\nresiliência]
+        EB_SCH[EventBridge Scheduler\nweekly reports]
+        SQS[SQS DLQ\nresilience]
     end
 
-    subgraph LambdaPlane["Funções Lambda  Governança"]
+    subgraph LambdaPlane["Lambda Functions - Governance"]
         L_EVAL[compliance-evaluator\nPython 3.12 + X-Ray]
         L_REM[auto-remediation\nPython 3.12 + X-Ray]
         L_NOT[incident-notifier\nPython 3.12]
         L_REP[audit-reporter\nPython 3.12]
     end
 
-    subgraph NotifPlane["Notificações Multi-Canal"]
+    subgraph NotifPlane["Multi-Channel Notifications"]
         SNS_C[SNS CRITICAL\nDPO + CTO + SecOps]
         SNS_W[SNS WARNING\nSecOps + Dev Lead]
-        SNS_I[SNS INFO\ntime de engenharia]
+        SNS_I[SNS INFO\nengineering team]
         CHATBOT[AWS Chatbot\nSlack integration]
     end
 
-    subgraph AuditPlane["Trilha de Auditoria Imutável"]
-        S3_AUDIT[S3 Audit Trail\nObject Lock 5 anos]
+    subgraph AuditPlane["Immutable Audit Trail"]
+        S3_AUDIT[S3 Audit Trail\nObject Lock 5 years]
         GLUE[AWS Glue\nData Catalog]
-        ATHENA[Amazon Athena\nSQL sobre logs]
+        ATHENA[Amazon Athena\nSQL over logs]
     end
 
-    subgraph ObsPlane["Observabilidade"]
+    subgraph ObsPlane["Observability"]
         CW_L[CloudWatch Logs\nlog groups]
         CW_M[CloudWatch Metrics\nwayfinder/Compliance]
         CW_A[CloudWatch Alarms\nSLA + thresholds]
         CW_D[CloudWatch Dashboard\nCommand Center]
-        XRAY[AWS X-Ray\ntracing distribuído]
+        XRAY[AWS X-Ray\ndistributed tracing]
     end
 
-    subgraph InfraPlane["Infraestrutura e Custo"]
-        KMS[AWS KMS\nCMKs por classificação]
+    subgraph InfraPlane["Infrastructure and Cost"]
+        KMS[AWS KMS\nCMKs per classification]
         BACKUP[AWS Backup\nVault Lock]
         BUDGETS[AWS Budgets\n80% + 100% alerts]
-        VPC[VPC + Endpoints\nisolamento de rede]
+        VPC[VPC + Endpoints\nnetwork isolation]
         ORG[AWS Organizations\nSCPs]
     end
 
@@ -106,7 +106,7 @@ graph TB
         TF_S[Terraform State\nS3 + DynamoDB]
     end
 
-    %% Fluxo do usuário
+    %% User flow
     DOC & PAT --> R53 --> CF --> WAF --> ALB --> ECS
     LAB --> APIGW --> L_EVAL
     WEAR --> APIGW --> KINESIS --> L_EVAL
@@ -123,18 +123,18 @@ graph TB
     GD & SECHUB & INSPECTOR -->|findings| EB
     EB --> L_EVAL
     L_EVAL --> L_REM & L_NOT & SNS_C & SNS_W
-    L_REM -->|corrige recurso| ECS & AURORA & S3H
+    L_REM -->|fixes resource| ECS & AURORA & S3H
     L_NOT --> SNS_C
     SNS_C --> CHATBOT & SNS_W
 
-    %% Auditoria
+    %% Audit
     ECS & AURORA & S3H -->|API calls| CT
     CT --> S3_AUDIT --> GLUE --> ATHENA
     EB_SCH --> L_REP --> ATHENA --> S3_AUDIT
 
-    %% Observabilidade
+    %% Observability
     L_EVAL & L_REM -->|logs| CW_L
-    L_EVAL -->|métricas| CW_M --> CW_A --> SNS_W
+    L_EVAL -->|metrics| CW_M --> CW_A --> SNS_W
     CW_L & CW_M --> CW_D
     L_EVAL & L_REM -.->|traces| XRAY
 
@@ -146,393 +146,391 @@ graph TB
     GHA --> TF_S
     GHA --> ECR --> ECS
 
-    %% Custo
+    %% Cost
     BUDGETS -->|alerts| SNS_W
     ORG --> IAM
 ```
 
 ---
 
-## 2. Diagrama de Rede Detalhado
+## 2. Detailed Network Diagram
 
 ```
 Internet
-   
-    Route 53 (DNS + Health Checks)  CloudFront (CDN + WAF)
-                                              
+   |
+    Route 53 (DNS + Health Checks) --> CloudFront (CDN + WAF)
+                                              |
                                         ACM (TLS 1.3)
-                                              
- VPC 10.0.0.0/16 
-                                                                             
-     Public Subnets    
-      10.0.1.0/24 (us-east-1a) | 10.0.2.0/24 (us-east-1b)               
-    ALB (10.0.1.10 / 10.0.2.10)  CloudFront Origin                    
-       NAT GW-1a (10.0.1.4)   NAT GW-1b (10.0.2.4)                        
-       [NO Bastion Host  acesso via SSM Session Manager]                  
-        
-                    ALB  HTTPS only (port 443)                             
-   Private App Subnets   
-    10.0.10.0/24 (us-east-1a) | 10.0.11.0/24 (us-east-1b)                
-    ECS Fargate Tasks (SG: sg-app)                                         
-      - vitacore-api:8080 (health check /health)                          
-      - Regras SG: ingress 8080 from sg-alb ONLY                          
-    Lambda Functions (SG: sg-lambda)                                       
-      - compliance-evaluator, auto-remediation, incident-notifier          
-      - Regras SG: egress only via VPC Endpoints                           
-    VPC Interface Endpoints (no NAT needed for AWS APIs):                 
-      - com.amazonaws.us-east-1.config                                    
-      - com.amazonaws.us-east-1.cloudtrail                                
-      - com.amazonaws.us-east-1.monitoring (CloudWatch)                   
-      - com.amazonaws.us-east-1.kms                                       
-      - com.amazonaws.us-east-1.sns                                       
-      - com.amazonaws.us-east-1.sqs                                       
-      - com.amazonaws.us-east-1.secretsmanager                            
-      - com.amazonaws.us-east-1.ecr.api + ecr.dkr                        
-      - com.amazonaws.us-east-1.ssm + ssmmessages + ec2messages           
-    VPC Gateway Endpoints (gratuitos):                                     
-      - S3 Gateway Endpoint                                                
-      - DynamoDB Gateway Endpoint                                          
-    
-                    Apenas porta 3306/6379 de sg-app                        
-   Private Data Subnets   
-    10.0.20.0/24 (us-east-1a) | 10.0.21.0/24 (us-east-1b)                
-    Aurora MySQL Writer (10.0.20.10)  us-east-1a                         
-    Aurora MySQL Reader (10.0.21.10)  us-east-1b (failover automático)   
-    Aurora MySQL Legacy (10.0.20.15)  histórico (migrando para enc.)     
-    ElastiCache Redis Primary (10.0.20.20)  us-east-1a                   
-    ElastiCache Redis Replica (10.0.21.20)  us-east-1b                   
-    SG: sg-data                                                            
-      - ingress 3306 from sg-app ONLY                                     
-      - ingress 6379 from sg-app ONLY                                     
-      - egress: NONE (sem saída da subnet de dados)                       
-    
-                                                                              
-  Security Groups Summary:                                                    
-  sg-alb:    ingress 443 from 0.0.0.0/0 (CloudFront only via WAF)           
-  sg-app:    ingress 8080 from sg-alb | egress 3306,6379 to sg-data         
-  sg-lambda: egress 443 to VPC Endpoints ONLY | no ingress                  
-  sg-data:   ingress 3306,6379 from sg-app ONLY | no egress                 
+                                              |
++-- VPC 10.0.0.0/16 ------------------------------------------------------------+
+|                                                                                |
+|   Public Subnets                                                               |
+|    10.0.1.0/24 (us-east-1a) | 10.0.2.0/24 (us-east-1b)                       |
+|    ALB (10.0.1.10 / 10.0.2.10) --> CloudFront Origin                          |
+|    NAT GW-1a (10.0.1.4) / NAT GW-1b (10.0.2.4)                               |
+|    [NO Bastion Host - access via SSM Session Manager]                         |
+|                   |                                                            |
+|                ALB - HTTPS only (port 443)                                    |
+|   Private App Subnets                                                          |
+|    10.0.10.0/24 (us-east-1a) | 10.0.11.0/24 (us-east-1b)                     |
+|    ECS Fargate Tasks (SG: sg-app)                                              |
+|      - vitacore-api:8080 (health check /health)                               |
+|      - SG rules: ingress 8080 from sg-alb ONLY                                |
+|    Lambda Functions (SG: sg-lambda)                                            |
+|      - compliance-evaluator, auto-remediation, incident-notifier              |
+|      - SG rules: egress only via VPC Endpoints                                |
+|    VPC Interface Endpoints (no NAT needed for AWS APIs):                      |
+|      - com.amazonaws.us-east-1.config                                         |
+|      - com.amazonaws.us-east-1.cloudtrail                                     |
+|      - com.amazonaws.us-east-1.monitoring (CloudWatch)                        |
+|      - com.amazonaws.us-east-1.kms                                            |
+|      - com.amazonaws.us-east-1.sns                                            |
+|      - com.amazonaws.us-east-1.sqs                                            |
+|      - com.amazonaws.us-east-1.secretsmanager                                 |
+|      - com.amazonaws.us-east-1.ecr.api + ecr.dkr                             |
+|      - com.amazonaws.us-east-1.ssm + ssmmessages + ec2messages                |
+|    VPC Gateway Endpoints (free):                                               |
+|      - S3 Gateway Endpoint                                                     |
+|      - DynamoDB Gateway Endpoint                                               |
+|                   |                                                            |
+|            Only port 3306/6379 from sg-app                                    |
+|   Private Data Subnets                                                         |
+|    10.0.20.0/24 (us-east-1a) | 10.0.21.0/24 (us-east-1b)                     |
+|    Aurora MySQL Writer (10.0.20.10) - us-east-1a                              |
+|    Aurora MySQL Reader (10.0.21.10) - us-east-1b (automatic failover)         |
+|    Aurora MySQL Legacy (10.0.20.15) - history (migrating to encryption)       |
+|    ElastiCache Redis Primary (10.0.20.20) - us-east-1a                        |
+|    ElastiCache Redis Replica (10.0.21.20) - us-east-1b                        |
+|    SG: sg-data                                                                 |
+|      - ingress 3306 from sg-app ONLY                                          |
+|      - ingress 6379 from sg-app ONLY                                          |
+|      - egress: NONE (no outbound from data subnet)                            |
++--------------------------------------------------------------------------------+
 
+Security Groups Summary:
+  sg-alb:    ingress 443 from 0.0.0.0/0 (CloudFront only via WAF)
+  sg-app:    ingress 8080 from sg-alb | egress 3306,6379 to sg-data
+  sg-lambda: egress 443 to VPC Endpoints ONLY | no ingress
+  sg-data:   ingress 3306,6379 from sg-app ONLY | no egress
 ```
 
 ---
 
-## 3. Fluxos de Dados Detalhados
+## 3. Detailed Data Flows
 
-### 3.1 Fluxo de Autenticação
-
-```
-Médico/Paciente
-  1. Acessa vitacore.health (Route 53  CloudFront)
-  2. Redireciona para Cognito Hosted UI (HTTPS)
-  3. Cognito autentica (MFA obrigatório para médicos)
-  4. Retorna JWT: id_token + access_token + refresh_token
-  5. Frontend inclui access_token no header Authorization: Bearer
-  6. ALB verifica JWT via Cognito Authorizer antes de rotear para ECS
-  7. ECS extrai claims do JWT (sub, email, custom:role)
-  8. Permissões avaliadas via RBAC interno da aplicação
-```
-
-### 3.2 Fluxo de Prontuário Eletrônico
+### 3.1 Authentication Flow
 
 ```
-Médico (HTTPS/TLS 1.3)
+Doctor/Patient
+  1. Accesses vitacore.health (Route 53 -> CloudFront)
+  2. Redirects to Cognito Hosted UI (HTTPS)
+  3. Cognito authenticates (mandatory MFA for doctors)
+  4. Returns JWT: id_token + access_token + refresh_token
+  5. Frontend includes access_token in Authorization: Bearer header
+  6. ALB verifies JWT via Cognito Authorizer before routing to ECS
+  7. ECS extracts JWT claims (sub, email, custom:role)
+  8. Permissions evaluated via application internal RBAC
+```
+
+### 3.2 Electronic Health Record Flow
+
+```
+Doctor (HTTPS/TLS 1.3)
    Route 53 (latency-based routing)
-   CloudFront (cache de assets estáticos, WAF)
-   WAF (regras OWASP Top 10, rate limiting 1000 req/min/IP)
+   CloudFront (static asset cache, WAF)
+   WAF (OWASP Top 10 rules, rate limiting 1000 req/min/IP)
    ALB (Cognito JWT verification)
-   ECS Fargate vitacore-api (HTTPS interna)
-   Secrets Manager (busca credenciais Aurora  cached 1h)
-   Aurora MySQL Writer (10.0.20.10:3306, TLS, criptografia KMS CMK)
-   Resposta retorna pela mesma cadeia
-  
-  Operações de escrita:
-   CloudTrail registra: PutItem, UpdateItem + user, IP, timestamp
-   S3 data event registrado se anexo for salvo
+   ECS Fargate vitacore-api (internal HTTPS)
+   Secrets Manager (fetch Aurora credentials - cached 1h)
+   Aurora MySQL Writer (10.0.20.10:3306, TLS, KMS CMK encryption)
+   Response returns through the same chain
+
+  Write operations:
+   CloudTrail records: PutItem, UpdateItem + user, IP, timestamp
+   S3 data event recorded if attachment is saved
 ```
 
-### 3.3 Fluxo de Dados de Wearable
+### 3.3 Wearable Data Flow
 
 ```
-Dispositivo (HTTPS)
-   API Gateway (Cognito Authorizer)
+Device (HTTPS) --> API Gateway (Cognito Authorizer)
    Kinesis Data Streams (2 shards, 7-day retention)
    Lambda processor (batch 100 records, 5s window)
    DynamoDB vitacore-wearable-data (SSE KMS CMK, PAY_PER_REQUEST)
-   EventBridge: anomalia detectada  alerta para médico
-  
-  Agregação diária (01h UTC):
-   EventBridge Scheduler  Glue ETL Job
-   S3 analytics (health-standard, Parquet, particionado por data)
-   Athena para consultas do médico no prontuário
+   EventBridge: anomaly detected -> alert to doctor
+
+  Daily aggregation (01h UTC):
+   EventBridge Scheduler -> Glue ETL Job
+   S3 analytics (health-standard, Parquet, partitioned by date)
+   Athena for doctor queries in the health record
 ```
 
-### 3.4 Fluxo de Conformidade (Wayfinder Core)
+### 3.4 Compliance Flow (Wayfinder Core)
 
 ```
-Recurso AWS muda de configuração
-   AWS Config Configuration Item gerado (< 1 minuto)
-   Config Rule avaliada (managed ou custom Lambda)
-   Se NON_COMPLIANT:
-       EventBridge event publicado no bus wayfinder-events
-       Rule de roteamento por severidade:
-          CRITICAL  Lambda compliance-evaluator (direto)
-          HIGH      Lambda compliance-evaluator via SQS
-          MEDIUM    SQS para processamento async
+AWS resource changes configuration
+   AWS Config Configuration Item generated (< 1 minute)
+   Config Rule evaluated (managed or custom Lambda)
+   If NON_COMPLIANT:
+       EventBridge event published on wayfinder-events bus
+       Routing rule by severity:
+          CRITICAL  -> Lambda compliance-evaluator (direct)
+          HIGH      -> Lambda compliance-evaluator via SQS
+          MEDIUM    -> SQS for async processing
        compliance-evaluator:
-          1. Enriquece evento: account, region, resource, tags, owner
-          2. Verifica guardrails (tag "remediation-exempt=true"?)
-          3. Determina tipo de remediação (automática vs manual)
-          4. Publica métrica CloudWatch wayfinder/Compliance/NonCompliant
-          5. Se remediação automática: invoca auto-remediation Lambda
-          6. Registra evento no S3 audit trail (imutável)
-       auto-remediation executa correção via SDK
-       incident-notifier formata e envia alerta
+          1. Enriches event: account, region, resource, tags, owner
+          2. Checks guardrails (tag "remediation-exempt=true"?)
+          3. Determines remediation type (automatic vs manual)
+          4. Publishes CloudWatch metric wayfinder/Compliance/NonCompliant
+          5. If automatic remediation: invokes auto-remediation Lambda
+          6. Records event in S3 audit trail (immutable)
+       auto-remediation executes fix via SDK
+       incident-notifier formats and sends alert
 ```
 
-### 3.5 Fluxo de Auditoria
+### 3.5 Audit Flow
 
 ```
-Qualquer API call na conta AWS
+Any API call in the AWS account
    CloudTrail (management events + S3/RDS data events)
-   S3 audit-trail bucket (criptografado KMS, Object Lock 5 anos)
-   Glue Crawler (diário 03h UTC): atualiza Data Catalog
-   Athena: queries ad-hoc via console ou Lambda audit-reporter
-  
-  Relatório semanal (sexta-feira 17h UTC):
-   EventBridge Scheduler  Lambda audit-reporter
-   Queries Athena: conformidade 7d, top violations, remediações executadas
-   Relatório JSON + PDF armazenado em S3 com metadados de período
-   SNS INFO  email para DPO + CTO + Board members
+   S3 audit-trail bucket (KMS encrypted, Object Lock 5 years)
+   Glue Crawler (daily 03h UTC): updates Data Catalog
+   Athena: ad-hoc queries via console or Lambda audit-reporter
+
+  Weekly report (Friday 17h UTC):
+   EventBridge Scheduler -> Lambda audit-reporter
+   Athena queries: 7d compliance, top violations, executed remediations
+   JSON + PDF report stored in S3 with period metadata
+   SNS INFO -> email to DPO + CTO + Board members
 ```
 
 ---
 
-## 4. Decisões de Multi-AZ e Alta Disponibilidade
+## 4. Multi-AZ and High Availability Decisions
 
-| Serviço | Configuração Multi-AZ | Failover | Notas |
+| Service | Multi-AZ Configuration | Failover | Notes |
 |---|---|---|---|
-| Aurora MySQL | Writer us-east-1a + Reader us-east-1b | Automático < 30s | Failover testado mensalmente |
-| ECS Fargate | Tasks em 2 AZs, min 2 tasks | ALB redistribui | Desired count: prod=4, dev=1 |
-| ElastiCache Redis | Primary 1a + Replica 1b | Automático (Multi-AZ mode) | Cache de sessões: TTL 30min |
-| NAT Gateway | 1 por AZ em prod | Roteamento por AZ | Dev: 1 NAT GW apenas (custo) |
-| ALB | Spans 2 AZs nativamente | Automático | Health check /health a cada 10s |
-| S3 | 11 9s durability nativo | N/A  regional | Object Lock protege vs delete |
-| DynamoDB | Global Tables ou Regional | Automático | Prod: Regional + AWS Backup |
+| Aurora MySQL | Writer us-east-1a + Reader us-east-1b | Automatic < 30s | Tested monthly |
+| ECS Fargate | Tasks in 2 AZs, min 2 tasks | ALB redistributes | Desired count: prod=4, dev=1 |
+| ElastiCache Redis | Primary 1a + Replica 1b | Automatic (Multi-AZ mode) | Session cache: TTL 30min |
+| NAT Gateway | 1 per AZ in prod | Routing per AZ | Dev: 1 NAT GW only (cost) |
+| ALB | Spans 2 AZs natively | Automatic | Health check /health every 10s |
+| S3 | 11 9s durability native | N/A - regional | Object Lock protects vs delete |
+| DynamoDB | Global Tables or Regional | Automatic | Prod: Regional + AWS Backup |
 
 ---
 
-## 5. Lista Completa de Serviços AWS
+## 5. Full AWS Service List
 
-### 5.1 Serviços de Aplicação
+### 5.1 Application Services
 
 **Amazon ECS Fargate**
-- Papel: executa os containers da API VitaCore Health (vitacore-api)
-- Integração: ECR (imagens)  ALB (tráfego)  Aurora/Redis (dados)
-- Config Rule: WAYFINDER-011 (privileged=false), WAYFINDER-006 (não em subnet pública)
-- Justificativa vs EC2: serverless, sem gerenciamento de SO, escala automática por CPU/memória
+- Role: runs VitaCore Health API containers (vitacore-api)
+- Integration: ECR (images) -> ALB (traffic) -> Aurora/Redis (data)
+- Config Rule: WAYFINDER-011 (privileged=false), WAYFINDER-006 (not in public subnet)
+- Justification vs EC2: serverless, no OS management, automatic scaling by CPU/memory
 
 **Amazon Aurora MySQL**
-- Papel: banco de dados principal para prontuários, laudos, dados clínicos
-- Integração: ECS (cliente), Secrets Manager (credenciais), KMS (criptografia), AWS Backup
-- Config Rule: WAYFINDER-004 (criptografia), `rds-storage-encrypted`
-- Justificativa vs RDS MySQL: failover automático < 30s, up to 15 read replicas, Serverless v2 option
+- Role: main database for records, reports, clinical data
+- Integration: ECS (client), Secrets Manager (credentials), KMS (encryption), AWS Backup
+- Config Rule: WAYFINDER-004 (encryption), `rds-storage-encrypted`
+- Justification vs RDS MySQL: automatic failover < 30s, up to 15 read replicas, Serverless v2 option
 
 **Amazon ElastiCache Redis**
-- Papel: cache de sessões Cognito, cache de consultas frequentes de prontuários, rate limiting
-- Integração: ECS (cliente via TLS), KMS (criptografia at-rest)
+- Role: Cognito session cache, frequent record query cache, rate limiting
+- Integration: ECS (client via TLS), KMS (at-rest encryption)
 - Config Rule: `elasticache-redis-cluster-automatic-backup`
-- Justificativa vs Memcached: persistência, cluster mode, pub/sub para notificações internas
+- Justification vs Memcached: persistence, cluster mode, pub/sub for internal notifications
 
 **Amazon Kinesis Data Streams**
-- Papel: ingestão em tempo real de dados de wearables (~2,4M eventos/dia)
-- Integração: API Gateway (produtor), Lambda (consumidor), DynamoDB (destino)
-- Configuração: 2 shards, retention 7 dias, server-side encryption KMS
-- Justificativa vs SQS: ordering por partition key (patient_id), replay de eventos, múltiplos consumidores
+- Role: real-time ingestion of wearable data (~2.4M events/day)
+- Integration: API Gateway (producer), Lambda (consumer), DynamoDB (destination)
+- Configuration: 2 shards, 7-day retention, server-side KMS encryption
+- Justification vs SQS: ordering by partition key (patient_id), event replay, multiple consumers
 
-### 5.2 Serviços de Borda e Entrega
+### 5.2 Edge and Delivery Services
 
 **Amazon CloudFront + AWS WAF**
-- Papel: CDN para assets estáticos, proteção DDoS Layer 3/4/7, OWASP Top 10
+- Role: CDN for static assets, DDoS Layer 3/4/7 protection, OWASP Top 10
 - WAF Rules: AWSManagedRulesCommonRuleSet, AWSManagedRulesKnownBadInputsRuleSet, rate limiting
-- Integração: Route 53 (DNS)  CloudFront  WAF  ALB
+- Integration: Route 53 (DNS) -> CloudFront -> WAF -> ALB
 - Config Rule: `wafv2-webacl-not-empty`
 
 **Amazon Route 53**
-- Papel: DNS autoritativo, health checks (30s interval), failover routing
-- Configuração: latency-based routing entre CloudFront distributions (futuro: multi-region)
-- Integração: ACM (certificados), CloudFront, ALB
+- Role: authoritative DNS, health checks (30s interval), failover routing
+- Configuration: latency-based routing between CloudFront distributions (future: multi-region)
+- Integration: ACM (certificates), CloudFront, ALB
 
 **Amazon Cognito**
-- Papel: autenticação de médicos (MFA obrigatório) e pacientes, federação com Google/Apple
-- Configuração: User Pools separados por persona; Identity Pools para acesso a S3 signed URLs
-- Integração: ALB (JWT authorizer), ECS (claims), API Gateway
+- Role: authentication for doctors (mandatory MFA) and patients, federation with Google/Apple
+- Configuration: separate User Pools per persona; Identity Pools for S3 signed URL access
+- Integration: ALB (JWT authorizer), ECS (claims), API Gateway
 
 **AWS Certificate Manager (ACM)**
-- Papel: TLS 1.3 para CloudFront, ALB, e APIs internas
-- Renovação automática; wildcard cert para *.vitacore.health
+- Role: TLS 1.3 for CloudFront, ALB, and internal APIs
+- Automatic renewal; wildcard cert for *.vitacore.health
 
-### 5.3 Serviços de Governança e Conformidade (Wayfinder Core)
+### 5.3 Governance and Compliance Services (Wayfinder Core)
 
 **AWS Config**
-- Papel: rastrear mudanças de configuração em todos os recursos, avaliar compliance continuamente
-- Configuração: all-supported resources, multi-region, snapshot diário
-- 24 Rules: 12 managed + 14 custom (WAYFINDER-001 a WAYFINDER-014)
+- Role: track configuration changes on all resources, continuously evaluate compliance
+- Configuration: all-supported resources, multi-region, daily snapshot
+- 24 Rules: 12 managed + 14 custom (WAYFINDER-001 to WAYFINDER-014)
 - Delivery: S3 audit bucket + SNS INFO
 
 **AWS CloudTrail**
-- Papel: log imutável de todas as API calls, data events S3 e RDS
-- Configuração: multi-region trail, log file validation, S3 data events para buckets health-*
-- Destino: S3 Object Lock COMPLIANCE 5 anos
+- Role: immutable log of all API calls, S3 and RDS data events
+- Configuration: multi-region trail, log file validation, S3 data events for health-* buckets
+- Destination: S3 Object Lock COMPLIANCE 5 years
 - Config Rule: `cloud-trail-enabled`, `cloudtrail-s3-dataevents-enabled`, WAYFINDER-003
 
 **AWS Security Hub**
-- Papel: postura de segurança consolidada, agrega findings de GuardDuty, Inspector, Config
+- Role: consolidated security posture, aggregates findings from GuardDuty, Inspector, Config
 - Standards: AWS FSBP + CIS AWS Foundations 1.4
-- Integração: EventBridge  Lambda compliance-evaluator para findings HIGH/CRITICAL
-- Meta: score FSBP > 85% em prod
+- Integration: EventBridge -> Lambda compliance-evaluator for HIGH/CRITICAL findings
+- Target: FSBP score > 85% in prod
 
 **Amazon GuardDuty**
-- Papel: detecção de ameaças com ML (reconhecimento, exfiltração, comprometimento de credenciais)
-- Configuração: finding_publishing_frequency = SIX_HOURS, S3 protection habilitado
-- Integração: EventBridge  Lambda incident-notifier para findings HIGH/CRITICAL
+- Role: ML-based threat detection (reconnaissance, exfiltration, credential compromise)
+- Configuration: finding_publishing_frequency = SIX_HOURS, S3 protection enabled
+- Integration: EventBridge -> Lambda incident-notifier for HIGH/CRITICAL findings
 - Config Rule: `guardduty-enabled-centralized`
 
 **AWS Inspector v2**
-- Papel: varredura de vulnerabilidades em EC2 (OS + aplicações) e imagens ECR (container)
-- Configuração: continuous scanning habilitado para EC2 + ECR
-- Integração: Security Hub (findings centralizados), EventBridge
+- Role: vulnerability scanning on EC2 (OS + applications) and ECR images (container)
+- Configuration: continuous scanning enabled for EC2 + ECR
+- Integration: Security Hub (centralized findings), EventBridge
 - Config Rule: `inspector-ec2-scan-enabled`
 
-### 5.4 Serviços de Auditoria e Análise
+### 5.4 Audit and Analysis Services
 
 **AWS Glue**
-- Papel: ETL e catalogação dos logs do CloudTrail, dados de wearables
-- Configuração: Crawler diário (03h UTC), Data Catalog para Athena
-- Integração: S3 (fonte e destino), Athena (consumidor do catálogo)
+- Role: ETL and cataloging of CloudTrail logs, wearable data
+- Configuration: daily Crawler (03h UTC), Data Catalog for Athena
+- Integration: S3 (source and destination), Athena (catalog consumer)
 
 **Amazon Athena**
-- Papel: SQL sobre logs CloudTrail e dados auditáveis  investigação forense, relatórios
-- Configuração: workgroup `wayfinder-audit` com limites de scan (10GB/query)
-- Integração: Glue Data Catalog, S3 (source + results), Lambda audit-reporter
+- Role: SQL over CloudTrail logs and auditable data - forensic investigation, reports
+- Configuration: workgroup `wayfinder-audit` with scan limits (10GB/query)
+- Integration: Glue Data Catalog, S3 (source + results), Lambda audit-reporter
 
 **Amazon QuickSight** *(roadmap Q1/2027)*
-- Papel: dashboards executivos para CEO/Board com KPIs de postura de segurança
-- Integração planejada: Athena  QuickSight SPICE datasets
-- Status: não implementado  Athena + CloudWatch Dashboard cobrem necessidade atual
+- Role: executive dashboards for CEO/Board with security posture KPIs
+- Planned integration: Athena -> QuickSight SPICE datasets
+- Status: not implemented - Athena + CloudWatch Dashboard cover current need
 
-### 5.5 Serviços de Segurança de Infraestrutura
+### 5.5 Infrastructure Security Services
 
-**AWS KMS  Customer Managed Keys**
+**AWS KMS - Customer Managed Keys**
 ```
-Chaves CMK por classificação de dado:
-vitacore-health-critical-key   S3 buckets health-critical, Aurora prontuários
+CMK keys per data classification:
+vitacore-health-critical-key   S3 health-critical buckets, Aurora records
 vitacore-health-standard-key   DynamoDB wearables, S3 health-standard
-vitacore-financial-key         RDS faturamento, S3 financeiro
+vitacore-financial-key         RDS billing, S3 financial
 vitacore-audit-key             S3 audit trail, CloudWatch Logs
 vitacore-infra-key             ECR, Secrets Manager, EBS volumes
 ```
-- Rotação automática anual habilitada para todas as CMKs
-- Key policies com condition `aws:ResourceTag/data-classification`
+- Annual automatic rotation enabled for all CMKs
+- Key policies with condition `aws:ResourceTag/data-classification`
 
 **AWS Secrets Manager**
-- Papel: armazenar credenciais Aurora, API keys de laboratórios, chaves de integração
-- Rotação automática: Lambda built-in para Aurora a cada 30 dias
-- Integração: ECS (task definition envFrom), Lambda (runtime SDK call)
+- Role: store Aurora credentials, laboratory API keys, integration keys
+- Automatic rotation: built-in Lambda for Aurora every 30 days
+- Integration: ECS (task definition envFrom), Lambda (runtime SDK call)
 - Config Rule: `secretsmanager-rotation-enabled`, WAYFINDER-014
-- Custo: $0.40/secret/mês + $0.05/10.000 chamadas
+- Cost: $0.40/secret/month + $0.05/10,000 calls
 
 **AWS Systems Manager**
-- Parameter Store: configurações não-sensíveis (feature flags, URLs de serviços)
-- Session Manager: acesso SSH-less a ECS tasks para debug (substituiu Bastion Host)
-- Patch Manager: patching de AMIs base e ECS instances (se EC2-backed)
+- Parameter Store: non-sensitive configurations (feature flags, service URLs)
+- Session Manager: SSH-less access to ECS tasks for debugging (replaced Bastion Host)
+- Patch Manager: patching of base AMIs and ECS instances (if EC2-backed)
 
 **AWS Backup**
-- Papel: backup centralizado com Vault Lock para todas as resources críticas
-- Configuração: vault lock COMPLIANCE mode para backups de Aurora, DynamoDB, S3
-- Plano: Aurora diário (retain 35 dias), semanal (retain 1 ano), mensal (retain 7 anos)
+- Role: centralized backup with Vault Lock for all critical resources
+- Configuration: COMPLIANCE mode vault lock for Aurora, DynamoDB, S3 backups
+- Plan: Aurora daily (retain 35 days), weekly (retain 1 year), monthly (retain 7 years)
 - Config Rule: `backup-plan-min-frequency-and-min-retention-check`
 
-### 5.6 Serviços de Observabilidade
+### 5.6 Observability Services
 
 **Amazon CloudWatch**
 - Log Groups: /vitacore/app, /vitacore/wayfinder/*, /aws/lambda/wayfinder-*
 - Custom Metrics: wayfinder/Compliance/NonCompliant, wayfinder/Remediation/AutoFixed
-- Dashboard: "Wayfinder Command Center" com 12 widgets
-- Alarms: 8 alarmes críticos, 5 de aviso
+- Dashboard: "Wayfinder Command Center" with 12 widgets
+- Alarms: 8 critical alarms, 5 warnings
 
 **AWS X-Ray**
-- Papel: tracing distribuído nas Lambdas de governança
-- Configuração: sampling rate 5% (custo) + 100% para traces com erros
-- Integração: CloudWatch ServiceMap para visualizar fluxo de eventos
+- Role: distributed tracing in governance Lambdas
+- Configuration: sampling rate 5% (cost) + 100% for traces with errors
+- Integration: CloudWatch ServiceMap to visualize event flow
 
 **AWS Budgets**
-- Budget #1: custo total mensal  alert 80% (WARNING), 100% (CRITICAL)
-- Budget #2: custo EC2+RDS  alert 70% para detectar instâncias ociosas
-- Integração: SNS WARNING topic  email + Slack
+- Budget #1: total monthly cost - alert 80% (WARNING), 100% (CRITICAL)
+- Budget #2: EC2+RDS cost - alert 70% to detect idle instances
+- Integration: SNS WARNING topic -> email + Slack
 
-### 5.7 Serviços de CI/CD e IaC
+### 5.7 CI/CD and IaC Services
 
 **GitHub Actions + Amazon ECR**
-- Papel: CI/CD para containers da aplicação e Terraform da governança
+- Role: CI/CD for application containers and governance Terraform
 - Workflows: terraform-plan.yml (PR), terraform-apply.yml (merge to main)
-- ECR: repositórios por serviço, image scanning habilitado, lifecycle policy (keep 10 últimas)
+- ECR: repositories per service, image scanning enabled, lifecycle policy (keep 10 latest)
 
 **AWS Organizations + SCPs**
-- Papel: guardrails de conta que nenhum IAM user/role pode contornar
-- SCPs ativas: `require-mfa-for-console`, `deny-root-account-actions`,
+- Role: account guardrails that no IAM user/role can bypass
+- Active SCPs: `require-mfa-for-console`, `deny-root-account-actions`,
   `require-encryption-at-rest`, `restrict-regions-to-us-east-1`
 
 ---
 
-## 6. Estimativa de Custo Detalhada
+## 6. Detailed Cost Estimate
 
-### 6.1 Ambiente Dev
+### 6.1 Dev Environment
 
-| Serviço | Configuração | Custo Mensal (USD) | Tier |
+| Service | Configuration | Monthly Cost (USD) | Tier |
 |---|---|---|---|
-| AWS Config | 15 rules, ~50 resources | $5.00 | Pago |
+| AWS Config | 15 rules, ~50 resources | $5.00 | Paid |
 | CloudTrail | 1 trail management events | $0.00 | Free (1 trail) |
-| CloudTrail data events | 100k events/mês | $0.10 | Pago |
-| Lambda (4 funções) | 50k invocações/mês | $0.10 | Free tier |
-| S3 audit trail | 5GB, Object Lock | $0.12 | Pago |
-| Athena | 10GB scan/mês | $0.50 | Pago |
-| CloudWatch Logs | 2GB ingest/mês | $1.02 | Pago |
-| CloudWatch Dashboard | 1 dashboard | $3.00 | Pago |
-| CloudWatch Alarms | 13 alarms | $3.90 | Pago |
-| KMS | 5 CMKs + 50k requests | $5.25 | Pago |
-| GuardDuty | 50GB VPC Flow/mês | $1.25 | Pago |
-| Security Hub | 50 resources | $0.75 | Pago |
-| Inspector v2 | ECR only (dev) | $0.09 | Pago |
+| CloudTrail data events | 100k events/month | $0.10 | Paid |
+| Lambda (4 functions) | 50k invocations/month | $0.10 | Free tier |
+| S3 audit trail | 5GB, Object Lock | $0.12 | Paid |
+| Athena | 10GB scan/month | $0.50 | Paid |
+| CloudWatch Logs | 2GB ingest/month | $1.02 | Paid |
+| CloudWatch Dashboard | 1 dashboard | $3.00 | Paid |
+| CloudWatch Alarms | 13 alarms | $3.90 | Paid |
+| KMS | 5 CMKs + 50k requests | $5.25 | Paid |
+| GuardDuty | 50GB VPC Flow/month | $1.25 | Paid |
+| Security Hub | 50 resources | $0.75 | Paid |
+| Inspector v2 | ECR only (dev) | $0.09 | Paid |
 | SNS | 3 topics, 1k emails | $0.10 | Free tier + $0.10 |
-| Secrets Manager | 5 secrets | $2.00 | Pago |
-| EventBridge | 100k events | $0.01 | Pago |
-| VPC Endpoints | 2 interface endpoints | $14.40 | Pago |
-| **TOTAL DEV** | | **~$38/mês** | |
+| Secrets Manager | 5 secrets | $2.00 | Paid |
+| EventBridge | 100k events | $0.01 | Paid |
+| VPC Endpoints | 2 interface endpoints | $14.40 | Paid |
+| **TOTAL DEV** | | **~$38/month** | |
 
-### 6.2 Ambiente Prod (estimativa com aplicação VitaCore completa)
+### 6.2 Prod Environment (estimate with full VitaCore application)
 
-| Serviço | Configuração | Custo Mensal (USD) |
+| Service | Configuration | Monthly Cost (USD) |
 |---|---|---|
 | AWS Config | 24 rules, ~200 resources | $18.00 |
 | ECS Fargate | 4 tasks, 0.5vCPU/1GB | $35.00 |
 | Aurora MySQL | 2 clusters Multi-AZ, db.r6g.large | $380.00 |
 | ElastiCache Redis | cache.r6g.large, 2 nodes | $145.00 |
-| CloudFront | 50GB transfer/mês | $4.25 |
+| CloudFront | 50GB transfer/month | $4.25 |
 | WAF | 2 WebACLs + rules | $18.00 |
 | Kinesis Data Streams | 2 shards | $22.00 |
-| S3 (todos os buckets) | 500GB total | $11.50 |
+| S3 (all buckets) | 500GB total | $11.50 |
 | Secrets Manager | 15 secrets | $6.00 |
-| GuardDuty | produção completa | $15.00 |
-| Security Hub | produção | $3.50 |
+| GuardDuty | full production | $15.00 |
+| Security Hub | production | $3.50 |
 | Inspector v2 | EC2 + ECR | $4.50 |
 | CloudWatch | prod volume | $25.00 |
 | KMS | 5 CMKs + 500k requests | $7.50 |
-| NAT Gateway | 2 NATs, 100GB/mês | $75.00 |
+| NAT Gateway | 2 NATs, 100GB/month | $75.00 |
 | VPC Endpoints | 10 interface endpoints | $72.00 |
 | AWS Backup | 1TB backup storage | $25.00 |
-| **TOTAL PROD** | | **~$870/mês** |
+| **TOTAL PROD** | | **~$870/month** |
 
-> **Nota de otimização:** NAT Gateway ($75) e VPC Interface Endpoints ($72) são os
-> maiores custos de infraestrutura de rede. Em dev, reduzir para 1 NAT GW e
-> 2 interface endpoints economiza ~$90/mês.
+> **Optimization note:** NAT Gateway ($75) and VPC Interface Endpoints ($72) are the
+> largest network infrastructure costs. In dev, reducing to 1 NAT GW and
+> 2 interface endpoints saves ~$90/month.

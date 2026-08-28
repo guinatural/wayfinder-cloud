@@ -1,168 +1,168 @@
-﻿# ADR-009  Estratégia de VPC Endpoints vs NAT Gateway
+﻿# ADR-009  VPC Endpoints vs NAT Gateway Strategy
 
-**Status:** Aceito  
-**Data:** 2026-08-21  
-**Autor:** Guilherme Barreto Gomes  
-**Revisores:** Rafael Santos (CTO), Bruno Oliveira (SecOps)
+**Status:** Accepted
+**Date:** 2026-08-21
+**Author:** Guilherme Barreto Gomes
+**Reviewers:** Rafael Santos (CTO), Bruno Oliveira (SecOps)
 
 ---
 
-## 1. Contexto
+## 1. Context
 
-As Lambdas do Wayfinder Cloud precisam se comunicar com múltiplos serviços AWS
+Wayfinder Cloud Lambdas need to communicate with multiple AWS services
 (Config, CloudTrail, CloudWatch, KMS, SNS, SQS, Secrets Manager, EventBridge, S3)
-para executar as funções de compliance e observabilidade.
+to perform compliance and observability functions.
 
-Existem duas formas de viabilizar esse acesso a partir de Lambdas em VPC privada:
+There are two ways to enable this access from Lambdas in a private VPC:
 
-1. **NAT Gateway**  roteia o tráfego para a internet pública onde os endpoints AWS estão
-2. **VPC Endpoints**  comunicação direta com os serviços AWS dentro da rede AWS, sem internet
+1. **NAT Gateway** - routes traffic to the public internet where AWS endpoints are
+2. **VPC Endpoints** - direct communication with AWS services inside the AWS network, without internet
 
-Ambas as opções têm implicações de custo, segurança e latência que precisam ser avaliadas.
-
----
-
-## 2. Opções Avaliadas
-
-### Opção A  NAT Gateway (única solução)
-
-**Arquitetura:** Lambdas em subnet privada  NAT GW em subnet pública  internet  APIs AWS
-
-**Prós:**
-- Configuração simples  um NAT Gateway cobre todos os serviços
-- Nenhum endpoint extra para gerenciar
-- Permite acesso à internet para casos legítimos (ex: webhook externo)
-
-**Contras:**
-- **Custo:** $0.045/hora por NAT GW × 730h/mês = $32.85/mês + $0.045/GB processado
-- **Segurança:** tráfego de dados sensíveis (credenciais KMS, logs CloudTrail) trafega pela internet pública antes de ser criptografado em nível de aplicação
-- **Performance:** latência adicional por roteamento via internet
-- **Risco regulatório:** para dados sensíveis de saúde (LGPD art. 46), preferível manter tráfego na rede privada AWS
-
-### Opção B  VPC Interface Endpoints para serviços críticos (ESCOLHIDA para segurança)
-
-**Arquitetura:** Lambdas em subnet privada  VPC Interface Endpoint  API AWS (rede AWS interna)
-
-**Prós:**
-- Tráfego nunca sai da rede AWS  nenhum dado percorre a internet pública
-- Latência menor (~1-2ms vs ~10-20ms via NAT)
-- Auditável: conexões aos endpoints aparecem no VPC Flow Logs
-- Permite bloquear acesso a serviços AWS específicos via endpoint policy
-- S3 e DynamoDB: Gateway Endpoints gratuitos
-
-**Contras:**
-- **Custo:** $0.01/hora por endpoint × 730h = $7.30/endpoint/mês
-- 9 Interface Endpoints = ~$65.70/mês (prod, 2 AZs)
-- Complexidade: cada endpoint precisa de Security Group e DNS resolution
-- Nem todos os serviços AWS têm VPC Endpoint disponível (ex: QuickSight)
-
-### Opção C  Híbrido: Endpoints para serviços críticos + NAT para demais
-
-**Arquitetura:** VPC Endpoints para Config, CloudTrail, KMS, Secrets Manager (dados sensíveis) + NAT GW para demais
-
-**Prós:** Custo reduzido vs opção B total
-
-**Contras:** Complexidade de gerenciar dois caminhos de saída; risco de roteamento incorreto
+Both options have cost, security, and latency implications that need to be evaluated.
 
 ---
 
-## 3. Decisão
+## 2. Options Evaluated
 
-**Opção B  VPC Interface Endpoints para todos os serviços AWS utilizados pelas Lambdas,**
-**mais Gateway Endpoints para S3 e DynamoDB (gratuitos).**
+### Option A - NAT Gateway (only solution)
 
-Mantemos também 1 NAT Gateway por ambiente (1 em dev, 2 em prod) para:
-- Lambdas que precisam chamar APIs externas (webhooks de laboratórios, PagerDuty)
-- Updates de pacotes durante o build (não usa NAT em runtime)
-- Fallback para serviços sem VPC Endpoint
+**Architecture:** Lambdas in private subnet -> NAT GW in public subnet -> internet -> AWS APIs
+
+**Pros:**
+- Simple setup - one NAT Gateway covers all services
+- No extra endpoints to manage
+- Allows internet access for legitimate cases (e.g., external webhook)
+
+**Cons:**
+- **Cost:** $0.045/hour per NAT GW x 730h/month = $32.85/month + $0.045/GB processed
+- **Security:** traffic for sensitive data (KMS credentials, CloudTrail logs) goes through the public internet before being encrypted at the application level
+- **Performance:** additional latency due to internet routing
+- **Regulatory risk:** for LGPD Art. 46 sensitive health data, it is preferable to keep traffic in the private AWS network
+
+### Option B - VPC Interface Endpoints for critical services (CHOSEN for security)
+
+**Architecture:** Lambdas in private subnet -> VPC Interface Endpoint -> AWS API (internal AWS network)
+
+**Pros:**
+- Traffic never leaves the AWS network - no data travels the public internet
+- Lower latency (~1-2ms vs ~10-20ms via NAT)
+- Auditable: connections to endpoints appear in VPC Flow Logs
+- Allows blocking access to specific AWS services via endpoint policy
+- S3 and DynamoDB: free Gateway Endpoints
+
+**Cons:**
+- **Cost:** $0.01/hour per endpoint x 730h = $7.30/endpoint/month
+- 9 Interface Endpoints = ~$65.70/month (prod, 2 AZs)
+- Complexity: each endpoint needs a Security Group and DNS resolution
+- Not all AWS services have a VPC Endpoint available (e.g., QuickSight)
+
+### Option C - Hybrid: Endpoints for critical services + NAT for others
+
+**Architecture:** VPC Endpoints for Config, CloudTrail, KMS, Secrets Manager (sensitive data) + NAT GW for the rest
+
+**Pros:** Reduced cost vs full Option B
+
+**Cons:** Complexity of managing two outbound paths; risk of incorrect routing
 
 ---
 
-## 4. Justificativa
+## 3. Decision
 
-### 4.1 Segurança (razão principal para o contexto VitaCore)
+**Option B - VPC Interface Endpoints for all AWS services used by Lambdas,**
+**plus Gateway Endpoints for S3 and DynamoDB (free).**
+
+We also keep 1 NAT Gateway per environment (1 in dev, 2 in prod) for:
+- Lambdas that need to call external APIs (laboratory webhooks, PagerDuty)
+- Package updates during build (does not use NAT at runtime)
+- Fallback for services without a VPC Endpoint
+
+---
+
+## 4. Justification
+
+### 4.1 Security (main reason for the VitaCore context)
 
 ```
-Com NAT Gateway:
-Lambda  NAT GW  internet pública  api.kms.us-east-1.amazonaws.com
-   tráfego KMS (chave de descriptografia de dados de saúde) via internet
+With NAT Gateway:
+Lambda -> NAT GW -> public internet -> api.kms.us-east-1.amazonaws.com
+   KMS traffic (health data decryption key) via internet
 
-Com VPC Interface Endpoint:
-Lambda  VPC Endpoint (ENI privado)  AWS network  KMS
-   tráfego KMS nunca sai da rede AWS
+With VPC Interface Endpoint:
+Lambda -> VPC Endpoint (private ENI) -> AWS network -> KMS
+   KMS traffic never leaves the AWS network
 ```
 
-Para dados de saúde sob LGPD art. 46, o tráfego de operações criptográficas
-(KMS), credenciais (Secrets Manager) e logs de auditoria (CloudTrail) deve,
-idealmente, nunca percorrer redes públicas  mesmo que o TLS proteja o conteúdo.
+For health data under LGPD Art. 46, traffic for cryptographic operations
+(KMS), credentials (Secrets Manager), and audit logs (CloudTrail) should,
+ideally, never travel through public networks - even if TLS protects the content.
 
-### 4.2 Conformidade com AWS Security Best Practices
+### 4.2 Compliance with AWS Security Best Practices
 
-O AWS Foundational Security Best Practices (FSBP) e o CIS AWS Benchmark recomendam
-o uso de VPC Endpoints para acesso a serviços AWS a partir de VPCs privadas.
-O Security Hub detectaria como finding se Lambdas em VPC não tivessem endpoints configurados.
+AWS Foundational Security Best Practices (FSBP) and the CIS AWS Benchmark recommend
+using VPC Endpoints for access to AWS services from private VPCs.
+Security Hub would detect it as a finding if Lambdas in VPC did not have endpoints configured.
 
-### 4.3 Análise de Custo (dev vs prod)
+### 4.3 Cost Analysis (dev vs prod)
 
-| Ambiente | NAT GW | Interface Endpoints | Gateway Endpoints | Total/mês |
+| Environment | NAT GW | Interface Endpoints | Gateway Endpoints | Total/month |
 |---|---|---|---|---|
-| Dev | 1 × $32.85 | 9 × $7.30 (1 AZ) | $0 | ~$98 |
-| Prod | 2 × $32.85 | 9 × $14.60 (2 AZs) | $0 | ~$197 |
+| Dev | 1 x $32.85 | 9 x $7.30 (1 AZ) | $0 | ~$98 |
+| Prod | 2 x $32.85 | 9 x $14.60 (2 AZs) | $0 | ~$197 |
 
-**Custo evitado por segurança:**
-- Um incidente como o de março custa ~R$ 2,1M
-- Custo anual de todos os endpoints em prod: ~$197 × 12 = $2.364  R$ 11.820
-- ROI de segurança: 177x
+**Cost avoided through security:**
+- One incident like March costs ~R$ 2.1M
+- Annual cost of all endpoints in prod: ~$197 x 12 = $2,364 = R$ 11,820
+- Security ROI: 177x
 
-### 4.4 Redução de Superfície de Ataque
+### 4.4 Attack Surface Reduction
 
-Com VPC Endpoints e Security Group sem egress para internet (exceto via NAT para APIs externas):
+With VPC Endpoints and Security Group without internet egress (except via NAT for external APIs):
 
 ```
 Security Group sg-lambda:
-  egress 443  pl-xxxxx (S3 prefix list via Gateway Endpoint)   S3
-  egress 443  ENI VPC Endpoints (via SG rule)                  todos os serviços
-  egress 443  0.0.0.0/0 via NAT (apenas para APIs externas)
-  ingress:   NONE (Lambdas não recebem tráfego direto)
+  egress 443  pl-xxxxx (S3 prefix list via Gateway Endpoint)   -> S3
+  egress 443  ENI VPC Endpoints (via SG rule)                  -> all services
+  egress 443  0.0.0.0/0 via NAT (only for external APIs)
+  ingress:   NONE (Lambdas do not receive direct traffic)
 ```
 
-Isso significa que mesmo se uma Lambda for comprometida, ela não consegue
-alcançar serviços não autorizados fora da rede AWS.
+This means that even if a Lambda is compromised, it cannot reach
+unauthorized services outside the AWS network.
 
 ---
 
-## 5. Endpoints Configurados
+## 5. Configured Endpoints
 
-| Endpoint | Tipo | Custo/AZ/mês | Serviço que usa |
+| Endpoint | Type | Cost/AZ/month | Service that uses it |
 |---|---|---|---|
-| `com.amazonaws.us-east-1.s3` | Gateway (gratuito) | $0 | Todas as Lambdas, CloudTrail |
-| `com.amazonaws.us-east-1.dynamodb` | Gateway (gratuito) | $0 | Lambda auto-remediation, guardrail |
+| `com.amazonaws.us-east-1.s3` | Gateway (free) | $0 | All Lambdas, CloudTrail |
+| `com.amazonaws.us-east-1.dynamodb` | Gateway (free) | $0 | Lambda auto-remediation, guardrail |
 | `com.amazonaws.us-east-1.config` | Interface | $7.30 | compliance-evaluator |
 | `com.amazonaws.us-east-1.cloudtrail` | Interface | $7.30 | auto-remediation |
-| `com.amazonaws.us-east-1.monitoring` | Interface | $7.30 | Todas as Lambdas (CloudWatch) |
-| `com.amazonaws.us-east-1.logs` | Interface | $7.30 | Todas as Lambdas (CW Logs) |
-| `com.amazonaws.us-east-1.kms` | Interface | $7.30 | Todas as Lambdas |
+| `com.amazonaws.us-east-1.monitoring` | Interface | $7.30 | All Lambdas (CloudWatch) |
+| `com.amazonaws.us-east-1.logs` | Interface | $7.30 | All Lambdas (CW Logs) |
+| `com.amazonaws.us-east-1.kms` | Interface | $7.30 | All Lambdas |
 | `com.amazonaws.us-east-1.sns` | Interface | $7.30 | compliance-evaluator, incident-notifier |
 | `com.amazonaws.us-east-1.sqs` | Interface | $7.30 | DLQ |
 | `com.amazonaws.us-east-1.secretsmanager` | Interface | $7.30 | ECS, Lambdas |
 | `com.amazonaws.us-east-1.events` | Interface | $7.30 | compliance-evaluator |
-| `com.amazonaws.us-east-1.lambda` | Interface | $7.30 | EventBridge  Lambda invocation |
+| `com.amazonaws.us-east-1.lambda` | Interface | $7.30 | EventBridge -> Lambda invocation |
 | `com.amazonaws.us-east-1.ssm` | Interface | $7.30 | Systems Manager Session Manager |
 | `com.amazonaws.us-east-1.ssmmessages` | Interface | $7.30 | SSM Session Manager |
 | `com.amazonaws.us-east-1.ec2messages` | Interface | $7.30 | SSM Agent |
 
-**Total Interface Endpoints: 13 × $7.30 = $94.90/AZ/mês em prod (2 AZs = $189.80)**
+**Total Interface Endpoints: 13 x $7.30 = $94.90/AZ/month in prod (2 AZs = $189.80)**
 
-> **Nota de otimização:** Em dev, os endpoints são provisionados em apenas 1 AZ,
-> reduzindo para $94.90/mês. A alta disponibilidade de endpoints em 2 AZs é
-> reservada para prod, onde a resilência é requisito contratual.
+> **Optimization note:** In dev, endpoints are provisioned in only 1 AZ,
+> reducing to $94.90/month. High endpoint availability in 2 AZs is
+> reserved for prod, where resilience is a contractual requirement.
 
 ---
 
-## 6. Endpoint Policy (Exemplo  KMS)
+## 6. Endpoint Policy (Example - KMS)
 
-Para máxima segurança, cada endpoint pode ter uma policy que restringe quais
-chamadas são permitidas. Exemplo para o endpoint KMS:
+For maximum security, each endpoint can have a policy that restricts which
+calls are allowed. Example for the KMS endpoint:
 
 ```json
 {
@@ -183,26 +183,26 @@ chamadas são permitidas. Exemplo para o endpoint KMS:
 }
 ```
 
-Isso impede que, mesmo com credenciais de outra conta injetadas maliciosamente
-na Lambda, o endpoint KMS responda a requisições fora da conta VitaCore.
+This prevents the KMS endpoint from responding to requests from outside the VitaCore
+account, even if credentials from another account were maliciously injected into the Lambda.
 
 ---
 
-## 7. Trade-offs Aceitos
+## 7. Trade-offs Accepted
 
-| Trade-off | Impacto | Mitigação |
+| Trade-off | Impact | Mitigation |
 |---|---|---|
-| Custo maior vs NAT-only ($95 vs $33/mês em dev) | Médio | Justificado pelo ROI de segurança (177x) |
-| Mais recursos para gerenciar (13 endpoints) | Baixo | Terraform `for_each` gerencia todos com um bloco |
-| Nem todos os serviços têm VPC Endpoint | Baixo | NAT GW permanece para APIs externas (PagerDuty, Slack) |
-| DNS resolution requer `enableDnsSupport = true` na VPC | Nenhum | Já configurado no módulo networking |
+| Higher cost vs NAT-only ($95 vs $33/month in dev) | Medium | Justified by security ROI (177x) |
+| More resources to manage (13 endpoints) | Low | Terraform `for_each` manages all with one block |
+| Not all AWS services have a VPC Endpoint | Low | NAT GW remains for external APIs (PagerDuty, Slack) |
+| DNS resolution requires `enableDnsSupport = true` in the VPC | None | Already configured in networking module |
 
 ---
 
-## 8. Consequências
+## 8. Consequences
 
-- Módulo `networking` DEVE provisionar os 13 VPC Endpoints listados
-- Security Group `sg-lambda` DEVE ter egress restrito a endpoints conhecidos
-- Todo novo serviço AWS adicionado ao projeto DEVE ter endpoint avaliado
-- Custo dos endpoints DEVE ser monitorado via Budget #1 (incluído no total)
-- VPC Flow Logs DEVEM estar habilitados para auditoria de tráfego via endpoints
+- `networking` module MUST provision the 13 listed VPC Endpoints
+- Security Group `sg-lambda` MUST have egress restricted to known endpoints
+- Every new AWS service added to the project MUST have an endpoint evaluated
+- Endpoint cost MUST be monitored via Budget #1 (included in total)
+- VPC Flow Logs MUST be enabled for traffic audit via endpoints

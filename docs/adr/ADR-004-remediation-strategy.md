@@ -1,99 +1,99 @@
-﻿# ADR-004  Estratégia de Remediação Automática
+﻿# ADR-004  Automatic Remediation Strategy
 
-**Status:** Aceito  
-**Data:** 2026-08-21  
-**Autor:** Guilherme Barreto Gomes  
-**Revisores:** 
-
----
-
-## Contexto
-
-Quando uma Config Rule detecta um desvio de conformidade, existem três estratégias possíveis:
-
-1. **Apenas notificar**  alerta humano, remediação manual
-2. **Remediação totalmente automática**  sistema corrige sem intervenção humana
-3. **Remediação automática seletiva**  automática para casos seguros, notificação para casos ambíguos
-
-Em um ambiente de saúde digital, remediação incorreta pode ser tão danosa quanto
-o desvio em si. Por exemplo: deletar automaticamente uma instância EC2 para "remediar"
-uma violação de security group pode derrubar um serviço crítico de atendimento.
+**Status:** Accepted
+**Date:** 2026-08-21
+**Author:** Guilherme Barreto Gomes
+**Reviewers:**
 
 ---
 
-## Decisão
+## Context
 
-**Remediação automática seletiva** baseada em classificação de risco e reversibilidade.
+When a Config Rule detects a compliance deviation, there are three possible strategies:
+
+1. **Notify only** - human alert, manual remediation
+2. **Fully automatic remediation** - system fixes without human intervention
+3. **Selective automatic remediation** - automatic for safe cases, notification for ambiguous cases
+
+In a digital health environment, incorrect remediation can be as damaging as
+the deviation itself. For example: automatically deleting an EC2 instance to "remediate"
+a security group violation can take down a critical care service.
 
 ---
 
-## Matriz de Remediação
+## Decision
 
-| Violação | Severidade | Remediação Automática | Justificativa |
+**Selective automatic remediation** based on risk classification and reversibility.
+
+---
+
+## Remediation Matrix
+
+| Violation | Severity | Auto-Remediation | Justification |
 |---|---|---|---|
-| S3 Block Public Access desabilitado | CRITICAL |  SIM  ativar Block Public Access | Ação reversível, risco alto demais para esperar |
-| S3 sem criptografia KMS | CRITICAL |  SIM  ativar SSE-KMS | Reversível, sem impacto operacional |
-| CloudTrail desabilitado | CRITICAL |  SIM  reabilitar CloudTrail | Reversível, sem impacto operacional |
-| Security Group com 0.0.0.0/0 na porta 22 | HIGH |  PARCIAL  revogar regra + notificar | Reversível mas pode impactar acesso legítimo |
-| EC2 em subnet pública com dados de saúde | CRITICAL |  PARCIAL  isolar via SG + notificar | Mover EC2 de subnet é disruptivo |
-| IAM com permissões admin excessivas | HIGH |  NÃO  apenas notificar | Remoção de permissão pode quebrar workflows |
-| RDS sem criptografia | HIGH |  NÃO  apenas notificar | Criptografar RDS existente requer recriação |
-| MFA desabilitado para IAM user | HIGH |  NÃO  apenas notificar | Não é possível forçar MFA remotamente |
+| S3 Block Public Access disabled | CRITICAL | YES - enable Block Public Access | Reversible action, risk too high to wait |
+| S3 without KMS encryption | CRITICAL | YES - enable SSE-KMS | Reversible, no operational impact |
+| CloudTrail disabled | CRITICAL | YES - re-enable CloudTrail | Reversible, no operational impact |
+| Security Group with 0.0.0.0/0 on port 22 | HIGH | PARTIAL - revoke rule + notify | Reversible but may impact legitimate access |
+| EC2 in public subnet with health data | CRITICAL | PARTIAL - isolate via SG + notify | Moving EC2 subnet is disruptive |
+| IAM with excessive admin permissions | HIGH | NO - notify only | Removing permission can break workflows |
+| RDS without encryption | HIGH | NO - notify only | Encrypting existing RDS requires recreation |
+| MFA disabled for IAM user | HIGH | NO - notify only | Cannot force MFA remotely |
 
 ---
 
-## Guardrails de Remediação
+## Remediation Guardrails
 
-Para evitar remediações em cascata ou loops:
+To prevent cascading remediations or loops:
 
 ```python
-# Lambda auto-remediation deve verificar:
-# 1. Tag "remediation-exempt=true" no recurso  pular remediação
-# 2. Ambiente = prod  exigir aprovação manual via SNS + Lambda approval
-# 3. Limite de 3 tentativas por recurso em 1h  evitar loop
-# 4. Janela de manutenção ativa  postergar remediação não crítica
+# Lambda auto-remediation must check:
+# 1. Tag "remediation-exempt=true" on resource -> skip remediation
+# 2. Environment = prod -> require manual approval via SNS + Lambda approval
+# 3. Limit of 3 attempts per resource in 1h -> prevent loop
+# 4. Active maintenance window -> defer non-critical remediation
 ```
 
 ---
 
-## Processo de Aprovação para Prod
+## Approval Process for Prod
 
 ```
-Violação detectada em prod
-        
-        
-Lambda compliance-evaluator classifica
-        
-         CRITICAL  Remediação automática imediata
-                        + Notificação pós-fato
-        
-         HIGH/MEDIUM  SNS notificação com link de aprovação
-                                    
-                          
-                                             
-                    Aprovado (2h)       Não respondido (2h)
-                                             
-                                             
-                   Auto-remediation    Escalation para
-                   executa             nível superior
+Violation detected in prod
+        |
+        v
+Lambda compliance-evaluator classifies
+        |
+        +-- CRITICAL --> Immediate automatic remediation
+        |                     + Post-fact notification
+        |
+        +-- HIGH/MEDIUM --> SNS notification with approval link
+                                        |
+                            +-----------+-----------+
+                            |                       |
+                     Approved (2h)           No response (2h)
+                            |                       |
+                            v                       v
+                   Auto-remediation          Escalation to
+                   executes                  higher level
 ```
 
 ---
 
-## Trade-offs Aceitos
+## Trade-offs Accepted
 
-| Trade-off | Impacto | Mitigação |
+| Trade-off | Impact | Mitigation |
 |---|---|---|
-| Remediação automática pode causar interrupção | Médio | Matriz conservadora  apenas ações claramente seguras são automáticas |
-| Notificação manual tem latência | Médio | CRITICAL sempre é automático; HIGH tem SLA de 2h |
-| Falso positivo pode remediar recurso legítimo | Baixo | Tag `remediation-exempt=true` permite exclusão explícita |
+| Automatic remediation may cause interruption | Medium | Conservative matrix - only clearly safe actions are automatic |
+| Manual notification has latency | Medium | CRITICAL is always automatic; HIGH has 2h SLA |
+| False positive may remediate a legitimate resource | Low | Tag `remediation-exempt=true` allows explicit exclusion |
 
 ---
 
-## Consequências
+## Consequences
 
-- Toda Lambda de remediação DEVE logar ação realizada no CloudWatch com formato estruturado JSON
-- Toda ação de remediação DEVE gerar evento no EventBridge para rastreabilidade
-- Tag `remediation-exempt=true` DEVE ser documentada como mecanismo de exclusão controlada
-- SLA de resposta DEVE ser definido por severidade e monitorado via CloudWatch
-- Runbook de remediação manual DEVE existir para cada caso onde automação não é aplicada
+- Every remediation Lambda MUST log the action taken in CloudWatch with structured JSON format
+- Every remediation action MUST generate an event in EventBridge for traceability
+- Tag `remediation-exempt=true` MUST be documented as a controlled exclusion mechanism
+- Response SLA MUST be defined by severity and monitored via CloudWatch
+- A manual remediation runbook MUST exist for each case where automation is not applied

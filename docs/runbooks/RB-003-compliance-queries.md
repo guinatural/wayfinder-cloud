@@ -1,15 +1,15 @@
 ﻿# Runbook RB-003  Queries Athena de Compliance
 
-**Projeto:** Wayfinder Cloud  
+**Project:** Wayfinder Cloud  
 **Versão:** 1.0  
 **Classificação:** OPERACIONAL
 
 ---
 
-## Pré-requisitos
+## Pré-Requirements
 
 - Acesso ao Athena Workgroup `wayfinder-audit`
-- Permissão `athena:StartQueryExecution` e `s3:GetObject` no bucket de auditoria
+- Permissão `athena:StartQueryExecution` e `s3:GetObject` no bucket de Audit
 - Database Glue: `wayfinder_audit`
 - Tabela principal: `cloudtrail_logs` (catalogada pelo Glue Crawler)
 
@@ -86,7 +86,7 @@ ORDER BY 1 DESC, 7 DESC
 ## Query 3: Recursos Sem Criptografia (Snapshot Atual)
 
 Lista recursos que estão sem criptografia habilitada, baseado nos eventos Config
-mais recentes. Útil para relatórios de conformidade LGPD Art. 46.
+mais recentes. Útil para relatórios de Compliance LGPD Art. 46.
 
 ```sql
 WITH latest_evaluations AS (
@@ -121,7 +121,7 @@ ORDER BY days_non_compliant DESC, resource_type, resource_id
 
 ## Query 4: Mudanças de IAM nos Últimos 30 Dias
 
-Auditoria completa de mudanças em IAM  criação/deleção de usuários, roles, policies
+Audit completa de mudanças em IAM  criação/deleção de usuários, roles, policies
 e access keys. Mapeado ao LGPD Art. 47 (segurança no tratamento).
 
 ```sql
@@ -191,7 +191,7 @@ ORDER BY eventtime DESC
 ## Query 6: Recursos Criados Sem Tags Obrigatórias
 
 Identifica recursos que foram criados sem as tags mandatórias de governança.
-Afeta rastreabilidade de custo e compliance.
+Afeta rastreabilidade de Cost e compliance.
 
 Tags obrigatórias por política: `Environment`, `Project`, `Owner`, `ManagedBy`
 
@@ -241,7 +241,7 @@ LIMIT 100
 ## Dicas de Performance
 
 1. **Sempre use filtros de data**  a tabela `cloudtrail_logs` é particionada por data
-2. **Prefira `LIMIT`** em queries exploratórias para evitar custo excessivo
+2. **Prefira `LIMIT`** em queries exploratórias para evitar Cost excessivo
 3. **Use o Workgroup `wayfinder-audit`**  tem limite de scan configurado para proteção
 4. **Salve queries frequentes**  Athena permite salvar named queries no workgroup
 5. **Use CTAS para relatórios grandes:**

@@ -1,113 +1,113 @@
-﻿# ADR-003  Trilha de Auditoria com S3 + Object Lock + Athena
+﻿# ADR-003  Audit Trail with S3 + Object Lock + Athena
 
-**Status:** Aceito  
-**Data:** 2026-08-21  
-**Autor:** Guilherme Barreto Gomes  
-**Revisores:** 
+**Status:** Accepted
+**Date:** 2026-08-21
+**Author:** Guilherme Barreto Gomes
+**Reviewers:**
 
 ---
 
-## Contexto
+## Context
 
-A LGPD (art. 37) exige que o controlador de dados mantenha registro das operações
-de tratamento de dados pessoais. Para dados de saúde (art. 11), esse requisito
-é ainda mais crítico. A trilha de auditoria precisa ser:
+LGPD (Art. 37) requires the data controller to maintain records of personal data
+processing operations. For health data (Art. 11), this requirement is even more critical.
+The audit trail must be:
 
-1. **Imutável**  ninguém pode deletar ou modificar logs após geração
-2. **Consultável**  equipe de segurança precisa investigar incidentes com SQL
-3. **Centralizada**  todos os logs (API calls, data access, Config changes) em um lugar
-4. **Econômica**  logs históricos de anos não devem custar uma fortuna
+1. **Immutable** - nobody can delete or modify logs after generation
+2. **Queryable** - the security team needs to investigate incidents with SQL
+3. **Centralized** - all logs (API calls, data access, Config changes) in one place
+4. **Cost-effective** - years of historical logs must not cost a fortune
 
-As opções avaliadas para armazenamento:
+Options evaluated for storage:
 
 1. S3 + Object Lock + Athena
 2. CloudWatch Logs Insights
 3. OpenSearch (Elasticsearch)
-4. RDS para logs estruturados
+4. RDS for structured logs
 
 ---
 
-## Decisão
+## Decision
 
-**S3 com Object Lock (COMPLIANCE mode) + AWS Glue Data Catalog + Amazon Athena**
-para armazenamento e consulta da trilha de auditoria.
-
----
-
-## Justificativa
-
-**Imutabilidade:**
-- S3 Object Lock em modo COMPLIANCE impede que qualquer usuário, incluindo root,
-  delete ou modifique objetos durante o período de retenção
-- Isso garante a cadeia de custódia dos logs exigida para fins jurídicos
-- CloudWatch Logs não oferece Object Lock  logs podem ser deletados
-
-**Custo:**
-- S3 Standard: ~$0.023/GB/mês  S3 Glacier: ~$0.004/GB/mês (lifecycle após 90 dias)
-- CloudWatch Logs: ~$0.50/GB ingerido + $0.03/GB armazenado  muito mais caro para volumes altos
-- OpenSearch: requer instâncias dedicadas, custo fixo independente do volume
-
-**Consultabilidade:**
-- Athena permite SQL diretamente sobre arquivos Parquet/JSON no S3
-- Sem servidor para gerenciar, sem custo de idle
-- CloudWatch Logs Insights tem sintaxe proprietária e limitações de escala
-
-**Escalabilidade:**
-- S3 escala infinitamente sem configuração
-- Athena escala automaticamente para queries em PB de dados
+**S3 with Object Lock (COMPLIANCE mode) + AWS Glue Data Catalog + Amazon Athena**
+for audit trail storage and querying.
 
 ---
 
-## Estrutura de Particionamento no S3
+## Justification
+
+**Immutability:**
+- S3 Object Lock in COMPLIANCE mode prevents any user, including root,
+  from deleting or modifying objects during the retention period
+- This guarantees the chain of custody of logs required for legal purposes
+- CloudWatch Logs does not offer Object Lock - logs can be deleted
+
+**Cost:**
+- S3 Standard: ~$0.023/GB/month -> S3 Glacier: ~$0.004/GB/month (lifecycle after 90 days)
+- CloudWatch Logs: ~$0.50/GB ingested + $0.03/GB stored - much more expensive for high volumes
+- OpenSearch: requires dedicated instances, fixed cost regardless of volume
+
+**Queryability:**
+- Athena allows SQL directly on Parquet/JSON files in S3
+- No server to manage, no idle cost
+- CloudWatch Logs Insights has a proprietary syntax and scale limitations
+
+**Scalability:**
+- S3 scales infinitely without configuration
+- Athena scales automatically for queries on petabytes of data
+
+---
+
+## S3 Partitioning Structure
 
 ```
 s3://vitacore-audit-trail-{account-id}/
- cloudtrail/
-    AWSLogs/{account-id}/CloudTrail/{region}/
-        {year}/{month}/{day}/
-            {account-id}_CloudTrail_{region}_{timestamp}.json.gz
- config/
-    {year}/{month}/{day}/
-        config-snapshot-{timestamp}.json.gz
- compliance-events/
+  cloudtrail/
+     AWSLogs/{account-id}/CloudTrail/{region}/
+         {year}/{month}/{day}/
+             {account-id}_CloudTrail_{region}_{timestamp}.json.gz
+  config/
      {year}/{month}/{day}/
-         wayfinder-events-{timestamp}.json
+         config-snapshot-{timestamp}.json.gz
+  compliance-events/
+      {year}/{month}/{day}/
+          wayfinder-events-{timestamp}.json
 ```
 
-Particionamento por `year/month/day` reduz custo de scan do Athena
-porque queries filtradas por data não leem partições irrelevantes.
+Partitioning by `year/month/day` reduces Athena scan cost
+because date-filtered queries do not read irrelevant partitions.
 
 ---
 
-## Política de Retenção
+## Retention Policy
 
-| Tipo de Log | Retenção S3 Standard | Retenção S3 Glacier | Object Lock |
+| Log Type | S3 Standard Retention | S3 Glacier Retention | Object Lock |
 |---|---|---|---|
-| CloudTrail management events | 90 dias | 5 anos | 5 anos |
-| CloudTrail data events (S3) | 30 dias | 2 anos | 2 anos |
-| Config snapshots | 90 dias | 1 ano | 1 ano |
-| Compliance events (Sentinel) | 90 dias | 5 anos | 5 anos |
+| CloudTrail management events | 90 days | 5 years | 5 years |
+| CloudTrail data events (S3) | 30 days | 2 years | 2 years |
+| Config snapshots | 90 days | 1 year | 1 year |
+| Compliance events (Wayfinder) | 90 days | 5 years | 5 years |
 
-Retenção de 5 anos para CloudTrail alinha com prazo prescricional do Código Civil
-(art. 205) e com práticas de compliance de saúde.
+5-year retention for CloudTrail aligns with the statute of limitations
+and health compliance best practices.
 
 ---
 
-## Trade-offs Aceitos
+## Trade-offs Accepted
 
-| Trade-off | Impacto | Mitigação |
+| Trade-off | Impact | Mitigation |
 |---|---|---|
-| Athena não é real-time | Baixo  auditoria é histórica, não real-time | Alertas em tempo real ficam no CloudWatch/SNS |
-| Object Lock impede correção de logs com erro | Baixo  logs são append-only, não são editados | Processo de geração de logs deve ser testado antes de habilitar lock |
-| Glue Crawler tem custo por DPU-hora | Baixo | Crawler agendado 1x/dia, não contínuo |
+| Athena is not real-time | Low - auditing is historical, not real-time | Real-time alerts stay in CloudWatch/SNS |
+| Object Lock prevents correcting logs with errors | Low - logs are append-only, not edited | Log generation process must be tested before enabling lock |
+| Glue Crawler has a cost per DPU-hour | Low | Crawler scheduled 1x/day, not continuous |
 
 ---
 
-## Consequências
+## Consequences
 
-- S3 bucket de audit trail DEVE ser criado com Object Lock habilitado (não pode ser habilitado depois)
-- Versioning DEVE estar habilitado (requisito do Object Lock)
-- Lifecycle rules DEVEM mover objetos para Glacier após 90 dias
-- Athena workgroup DEVE ter resultado de queries salvo em S3 separado com custo controlado
-- CloudTrail DEVE ter S3 data events habilitados para buckets com dados de saúde
-- KMS CMK DEVE ser usado para criptografar todos os logs
+- S3 audit trail bucket MUST be created with Object Lock enabled (cannot be enabled later)
+- Versioning MUST be enabled (Object Lock requirement)
+- Lifecycle rules MUST move objects to Glacier after 90 days
+- Athena workgroup MUST have query results saved in a separate S3 bucket with cost control
+- CloudTrail MUST have S3 data events enabled for health data buckets
+- KMS CMK MUST be used to encrypt all logs

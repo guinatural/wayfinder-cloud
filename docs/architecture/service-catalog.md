@@ -9,7 +9,7 @@
 
 - **Tier Core:** serviços sem os quais a aplicação VitaCore não funciona
 - **Tier Supporting:** serviços que melhoram resiliência, segurança ou experiência
-- **Tier Governance:** serviços do Wayfinder Cloud (conformidade e auditoria)
+- **Tier Governance:** serviços do Wayfinder Cloud (Compliance e Audit)
 
 ---
 
@@ -25,8 +25,8 @@
 | **Configuração prod** | 4 tasks vitacore-api (0.5 vCPU/1GB), 2 tasks vitacore-worker (1 vCPU/2GB), 2 AZs |
 | **Integração** | ECR (imagens), ALB (tráfego), Aurora (dados), ElastiCache (cache), Secrets Manager (credenciais), X-Ray (tracing), CloudWatch (logs) |
 | **Config Rule** | WAYFINDER-006 (não em subnet pública), WAYFINDER-011 (não privileged) |
-| **Custo mensal** | ~$35 (prod) / ~$4 (dev, 1 task) |
-| **Justificativa** | Serverless  sem gerenciamento de SO, patching automático, escala por CPU/memória, integração nativa com IAM roles por task |
+| **Cost mensal** | ~$35 (prod) / ~$4 (dev, 1 task) |
+| **Justification** | Serverless  sem gerenciamento de SO, patching automático, escala por CPU/memória, integração nativa com IAM roles por task |
 | **Alternativa descartada** | EKS: overhead operacional excessivo para time de 23 engenheiros sem experiência Kubernetes |
 
 ### 1.2 Amazon Aurora MySQL
@@ -39,8 +39,8 @@
 | **Configuração** | db.r6g.large, Multi-AZ (writer us-east-1a / reader us-east-1b), backup retention 35 dias |
 | **Integração** | ECS (cliente), Secrets Manager (credenciais rotadas 30d), KMS CMK (criptografia), AWS Backup (backup centralizado), CloudTrail (API audit) |
 | **Config Rule** | WAYFINDER-004, `rds-storage-encrypted` |
-| **Custo mensal** | ~$380 (prod) / ~$55 (dev, db.t4g.medium) |
-| **Justificativa** | Failover automático < 30s vs RDS MySQL padrão (1-2 min), Performance Insights incluído, Serverless v2 para picos de carga |
+| **Cost mensal** | ~$380 (prod) / ~$55 (dev, db.t4g.medium) |
+| **Justification** | Failover automático < 30s vs RDS MySQL padrão (1-2 min), Performance Insights incluído, Serverless v2 para picos de carga |
 | **Alternativa descartada** | DynamoDB: modelo relacional dos prontuários com JOINs complexos inviabiliza NoSQL |
 
 ### 1.3 Amazon ElastiCache Redis
@@ -53,8 +53,8 @@
 | **Configuração** | cache.r6g.large, cluster mode desabilitado, 1 replica em us-east-1b, automatic-failover habilitado |
 | **Integração** | ECS (cliente via TLS + AUTH token), KMS (at-rest encryption), AWS Backup |
 | **Config Rule** | `elasticache-redis-cluster-automatic-backup` |
-| **Custo mensal** | ~$145 (prod) / ~$15 (dev, cache.t4g.micro) |
-| **Justificativa** | Reduz carga Aurora em 60% para queries repetitivas, TTL gerenciado automaticamente, persistência opcional para sessões |
+| **Cost mensal** | ~$145 (prod) / ~$15 (dev, cache.t4g.micro) |
+| **Justification** | Reduz carga Aurora em 60% para queries repetitivas, TTL gerenciado automaticamente, persistência opcional para sessões |
 | **Alternativa descartada** | DAX: específico para DynamoDB; não cobre cache de sessões e rate limiting |
 
 ### 1.4 Amazon S3  Buckets de Dados de Saúde
@@ -67,9 +67,9 @@
 | **Config aplicada** | SSE-KMS com CMK, Block Public Access habilitado em todos, Object Lock COMPLIANCE para buckets health-critical (7.305 dias) e financial-sensitive (3.650 dias) |
 | **Integração** | CloudFront (signed URLs para laudos), Lambda (leitura/escrita), Glue (catalogação), Athena (queries), AWS Backup |
 | **Config Rule** | WAYFINDER-001, WAYFINDER-002, WAYFINDER-013, `s3-bucket-public-read-prohibited` |
-| **Custo mensal** | ~$11.50 (prod, 500GB) / ~$0.12 (dev) |
-| **Justificativa** | 11 9s de durabilidade; Object Lock COMPLIANCE mode é o único mecanismo que garante imutabilidade legal dos prontuários por 20 anos |
-| **Alternativa descartada** | EFS: desnecessário para objetos não estruturados; custo 10x superior ao S3 |
+| **Cost mensal** | ~$11.50 (prod, 500GB) / ~$0.12 (dev) |
+| **Justification** | 11 9s de durabilidade; Object Lock COMPLIANCE mode é o único mecanismo que garante imutabilidade legal dos prontuários por 20 anos |
+| **Alternativa descartada** | EFS: desnecessário para objetos não estruturados; Cost 10x superior ao S3 |
 
 ### 1.5 Amazon DynamoDB
 
@@ -81,8 +81,8 @@
 | **Configuração** | PAY_PER_REQUEST, SSE com CMK, PITR habilitado |
 | **Integração** | Lambda (leitura/escrita), Kinesis (ingestão wearable), Terraform state lock (tabela separada) |
 | **Config Rule** | WAYFINDER-010, `dynamodb-table-encrypted-at-rest` |
-| **Custo mensal** | ~$8 (prod, wearable volume) / ~$0.25 (dev) |
-| **Justificativa** | Schema-less ideal para dados de wearables com estrutura variável por dispositivo; PAY_PER_REQUEST elimina over-provisioning |
+| **Cost mensal** | ~$8 (prod, wearable volume) / ~$0.25 (dev) |
+| **Justification** | Schema-less ideal para dados de wearables com Structure variável por dispositivo; PAY_PER_REQUEST elimina over-provisioning |
 
 ### 1.6 Amazon Kinesis Data Streams
 
@@ -94,13 +94,13 @@
 | **Configuração** | 2 shards (1MB/s in, 2MB/s out por shard), retention 7 dias, server-side encryption KMS |
 | **Integração** | API Gateway (produtor), Lambda (consumidor com batching 100 records), DynamoDB (destino), CloudWatch (métricas de shard) |
 | **Config Rule** | Monitorado via CloudWatch Alarms (IteratorAgeMilliseconds) |
-| **Custo mensal** | ~$22 (prod) / ~$0 (dev, on-demand) |
-| **Justificativa** | Ordering por partition key (patient_id) que SQS não oferece; replay de 7 dias para reprocessamento; múltiplos consumidores (Lambda + Glue) |
+| **Cost mensal** | ~$22 (prod) / ~$0 (dev, on-demand) |
+| **Justification** | Ordering por partition key (patient_id) que SQS não oferece; replay de 7 dias para reprocessamento; múltiplos consumidores (Lambda + Glue) |
 | **Alternativa descartada** | SQS FIFO: limite de 300 msg/s por group ID inviabiliza volume de wearables; sem replay |
 
 ---
 
-## 2. Serviços Supporting  Borda, Autenticação e Rede
+## 2. Serviços Supporting  Borda, Autenticação e Network
 
 ### 2.1 Amazon CloudFront
 
@@ -111,7 +111,7 @@
 | **Configuração** | Price Class All (latência mínima), HTTPS only, TLS 1.2 min (1.3 preferido), Origin Shield habilitado, cache behaviors por path |
 | **Integração** | Route 53, WAF, ACM, S3 (laudos), ALB (API origin) |
 | **Config Rule** | `wafv2-webacl-not-empty` (WAF associado ao distribution) |
-| **Custo mensal** | ~$4.25 (prod, 50GB transfer) |
+| **Cost mensal** | ~$4.25 (prod, 50GB transfer) |
 
 ### 2.2 AWS WAF
 
@@ -119,10 +119,10 @@
 |---|---|
 | **Tier** | Supporting |
 | **Função VitaCore** | Proteção OWASP Top 10, rate limiting (1000 req/min por IP), bloqueio de bots maliciosos, proteção contra SQL injection e XSS |
-| **Regras ativas** | AWSManagedRulesCommonRuleSet, AWSManagedRulesKnownBadInputsRuleSet, AWSManagedRulesSQLiRuleSet, rate-based rule |
+| **Rules ativas** | AWSManagedRulesCommonRuleSet, AWSManagedRulesKnownBadInputsRuleSet, AWSManagedRulesSQLiRuleSet, rate-based rule |
 | **Integração** | CloudFront, ALB |
 | **Config Rule** | `wafv2-webacl-not-empty` |
-| **Custo mensal** | ~$18 (2 WebACLs + regras managed) |
+| **Cost mensal** | ~$18 (2 WebACLs + Rules managed) |
 
 ### 2.3 Amazon Cognito
 
@@ -133,9 +133,9 @@
 | **Configuração** | Password policy: 12 chars min, upper+lower+digit+symbol; advanced security (bot detection) habilitado |
 | **Integração** | ALB (JWT authorizer), API Gateway (authorizer), CloudFront (Lambda@Edge para autorização) |
 | **Config Rule** | Monitorado via CloudWatch Insights (failed logins > 10/min  alarme) |
-| **Custo mensal** | ~$5.50 (prod, 5k MAU médicos + 50k MAU pacientes) |
-| **Justificativa** | Eliminação de código de auth customizado; HIPAA eligible service; integração nativa com ALB |
-| **Alternativa descartada** | Auth0: custo 5x superior em escala; dados fora da AWS (compliance LGPD preferência in-cloud) |
+| **Cost mensal** | ~$5.50 (prod, 5k MAU médicos + 50k MAU pacientes) |
+| **Justification** | Eliminação de código de auth customizado; HIPAA eligible service; integração nativa com ALB |
+| **Alternativa descartada** | Auth0: Cost 5x superior em escala; dados fora da AWS (compliance LGPD preferência in-cloud) |
 
 ### 2.4 Amazon Route 53
 
@@ -145,7 +145,7 @@
 | **Função VitaCore** | DNS autoritativo para *.vitacore.health, health checks a cada 30s, failover para página de manutenção se ALB unhealthy |
 | **Configuração** | Latency-based routing, private hosted zone para comunicação interna VPC, health checks HTTP + HTTPS |
 | **Integração** | CloudFront (distribuição principal), ACM (validação de certificados) |
-| **Custo mensal** | ~$1.00 (1 hosted zone + health checks) |
+| **Cost mensal** | ~$1.00 (1 hosted zone + health checks) |
 
 ### 2.5 AWS Secrets Manager
 
@@ -156,8 +156,8 @@
 | **Rotação automática** | Aurora: Lambda rotator built-in a cada 30 dias; API keys externos: manual com alerta via WAYFINDER-012 |
 | **Integração** | ECS (envFrom em task definition), Lambda (SDK call no init), Secrets Manager Rotation Lambda |
 | **Config Rule** | WAYFINDER-014, `secretsmanager-rotation-enabled` |
-| **Custo mensal** | ~$6.00 (15 secrets × $0.40) |
-| **Justificativa** | Eliminação de credenciais hardcoded (origem do WAYFINDER-007); rotação automática sem downtime via dual-password strategy |
+| **Cost mensal** | ~$6.00 (15 secrets × $0.40) |
+| **Justification** | Eliminação de credenciais hardcoded (origem do WAYFINDER-007); rotação automática sem downtime via dual-password strategy |
 | **Alternativa descartada** | SSM Parameter Store SecureString: sem rotação automática, sem versionamento de segredos |
 
 ### 2.6 Amazon ECR
@@ -168,7 +168,7 @@
 | **Função VitaCore** | Registry privado para imagens Docker: vitacore-api, vitacore-worker, vitacore-telehealth, wayfinder-lambdas (para Lambdas empacotadas em container) |
 | **Configuração** | Image scanning on push (Inspector v2), lifecycle policy: keep 10 latest + 30 days untagged, cross-region replication (futuro) |
 | **Integração** | ECS (pull no deploy), Inspector v2 (scan), GitHub Actions (push no CI/CD), KMS (criptografia) |
-| **Custo mensal** | ~$2.50 (10GB storage) |
+| **Cost mensal** | ~$2.50 (10GB storage) |
 
 ### 2.7 AWS Certificate Manager (ACM)
 
@@ -177,7 +177,7 @@
 | **Tier** | Supporting |
 | **Função VitaCore** | Certificados TLS para vitacore.health, *.vitacore.health, APIs internas |
 | **Configuração** | Renovação automática, validação via DNS (Route 53), certificados em us-east-1 (CloudFront) e us-east-1 (ALB) |
-| **Custo mensal** | $0 (gratuito para certificados públicos ACM) |
+| **Cost mensal** | $0 (gratuito para certificados públicos ACM) |
 
 ### 2.8 AWS Systems Manager
 
@@ -185,10 +185,10 @@
 |---|---|
 | **Tier** | Supporting |
 | **Função VitaCore** | (1) Session Manager: acesso SSH-less a ECS tasks e EC2 para debug  substitui Bastion Host; (2) Parameter Store: feature flags, URLs de serviços externos, configs não-sensíveis; (3) Patch Manager: baseline de patches para AMIs base |
-| **Integração** | IAM (roles com ssm:StartSession), CloudTrail (auditoria de sessões), EC2 (SSM Agent) |
+| **Integração** | IAM (roles com ssm:StartSession), CloudTrail (Audit de sessões), EC2 (SSM Agent) |
 | **Config Rule** | `ec2-instance-managed-by-ssm` |
-| **Custo mensal** | ~$0 (Session Manager e Parameter Store Standard gratuitos) |
-| **Justificativa** | Elimina Bastion Host (economia de ~$15/mês por EC2 t3.micro) e acesso SSH na internet; Session Manager registra sessão no CloudTrail |
+| **Cost mensal** | ~$0 (Session Manager e Parameter Store Standard gratuitos) |
+| **Justification** | Elimina Bastion Host (economia de ~$15/mês por EC2 t3.micro) e acesso SSH na internet; Session Manager registra sessão no CloudTrail |
 
 ---
 
@@ -199,11 +199,11 @@
 | Atributo | Detalhe |
 |---|---|
 | **Tier** | Governance |
-| **Função Wayfinder** | Motor central do Wayfinder Cloud: rastreia mudanças de configuração em todos os recursos, avalia conformidade contra 24 rules, dispara eventos para remediação |
+| **Função Wayfinder** | Motor central do Wayfinder Cloud: rastreia mudanças de configuração em todos os recursos, avalia Compliance contra 24 rules, dispara eventos para remediação |
 | **Configuração** | all-supported resources, include_global_resource_types, continuous recording, snapshot diário, delivery channel S3 + SNS |
 | **Rules** | 10 managed (pré-existentes) + 12 managed (novas) + 14 custom WAYFINDER-001 a 014 |
 | **Integração** | EventBridge (eventos de non-compliance), S3 (snapshots), SNS (delivery notifications), Lambda (custom rules) |
-| **Custo mensal** | ~$18 (prod) / ~$5 (dev) |
+| **Cost mensal** | ~$18 (prod) / ~$5 (dev) |
 
 ### 3.2 AWS CloudTrail
 
@@ -213,8 +213,8 @@
 | **Função Wayfinder** | Trilha imutável de TODA atividade da conta AWS: quem fez o quê, quando e de onde. Base para investigação forense e relatórios LGPD |
 | **Configuração** | Multi-region trail, log file validation SHA-256, S3 data events para buckets health-*, RDS management events, CloudTrail Insights (anomalias) |
 | **Destino** | S3 audit-trail (Object Lock COMPLIANCE 1.825 dias / 5 anos) criptografado com CMK |
-| **Integração** | S3 (storage), Glue + Athena (análise), CloudWatch (métricas de uso), WAYFINDER-003 (monitoramento) |
-| **Custo mensal** | ~$5 (data events) / $0 (management events no primeiro trail) |
+| **Integração** | S3 (storage), Glue + Athena (análise), CloudWatch (métricas de uso), WAYFINDER-003 (Monitoring) |
+| **Cost mensal** | ~$5 (data events) / $0 (management events no primeiro trail) |
 
 ### 3.3 Amazon EventBridge
 
@@ -224,11 +224,11 @@
 | **Função Wayfinder** | Barramento de eventos central do Wayfinder: roteia Config NON_COMPLIANT events, GuardDuty findings, Security Hub findings e CloudTrail events críticos para as Lambdas corretas |
 | **Configuração** | Custom event bus `wayfinder-events`, 8 rules de roteamento por pattern matching, EventBridge Scheduler para relatório semanal |
 | **Integração** | Config (fonte), GuardDuty (fonte), Security Hub (fonte), Lambda (destino), SQS DLQ (fallback) |
-| **Custo mensal** | ~$0.01 (100k events) |
+| **Cost mensal** | ~$0.01 (100k events) |
 
 ### 3.4 AWS Lambda  Funções de Governança
 
-| Função | Papel | Trigger | Runtime | Custo/mês |
+| Função | Papel | Trigger | Runtime | Cost/mês |
 |---|---|---|---|---|
 | `compliance-evaluator` | Enriquece e classifica eventos, aciona remediação | EventBridge direto (CRITICAL) + SQS (demais) | Python 3.12, 512MB, X-Ray | ~$0.10 |
 | `auto-remediation` | Executa correções automáticas via SDK com guardrails | compliance-evaluator (invoke) | Python 3.12, 256MB, X-Ray | ~$0.05 |
@@ -244,8 +244,8 @@
 | **Configuração** | finding_publishing_frequency = SIX_HOURS, S3 protection, EKS protection (futuro), Malware protection |
 | **Integração** | EventBridge (findings  Lambda incident-notifier), Security Hub (findings centralizados), CloudTrail + DNS logs + VPC Flow Logs (fontes de análise) |
 | **Config Rule** | `guardduty-enabled-centralized` |
-| **Custo mensal** | ~$15 (prod, análise de VPC Flow Logs + DNS + CloudTrail) |
-| **Justificativa** | GuardDuty teria detectado acesso anômalo ao bucket durante o incidente de março em ~1h via finding UnauthorizedAccess:S3/MaliciousIPCaller |
+| **Cost mensal** | ~$15 (prod, análise de VPC Flow Logs + DNS + CloudTrail) |
+| **Justification** | GuardDuty teria detectado acesso anômalo ao bucket durante o incidente de março em ~1h via finding UnauthorizedAccess:S3/MaliciousIPCaller |
 
 ### 3.6 AWS Security Hub
 
@@ -257,7 +257,7 @@
 | **Meta de score** | FSBP > 85%, CIS > 80% em produção |
 | **Integração** | EventBridge (findings HIGH/CRITICAL  Lambda), GuardDuty (fonte), Inspector (fonte), Config (fonte) |
 | **Config Rule** | `securityhub-enabled` |
-| **Custo mensal** | ~$3.50 (prod) |
+| **Cost mensal** | ~$3.50 (prod) |
 
 ### 3.7 AWS Inspector v2
 
@@ -268,7 +268,7 @@
 | **Configuração** | EC2 scanning + ECR scanning habilitados, continuous scanning (não one-time) |
 | **Integração** | Security Hub (findings), EventBridge (findings CRITICAL), ECR (trigger no push de imagem) |
 | **Config Rule** | `inspector-ec2-scan-enabled` |
-| **Custo mensal** | ~$4.50 (prod) |
+| **Cost mensal** | ~$4.50 (prod) |
 
 ### 3.8 Amazon Athena
 
@@ -279,16 +279,16 @@
 | **Workgroup** | `wayfinder-audit`: limite de $5/query (proteção contra scans acidentais), output criptografado com CMK |
 | **Queries salvas** | 12 queries pré-construídas no Runbook RB-003 para cenários comuns |
 | **Integração** | Glue Data Catalog (schema), S3 (source + results), Lambda audit-reporter |
-| **Custo mensal** | ~$2.50 (50GB scan/mês) |
+| **Cost mensal** | ~$2.50 (50GB scan/mês) |
 
 ### 3.9 AWS Budgets
 
 | Atributo | Detalhe |
 |---|---|
 | **Tier** | Governance |
-| **Função Wayfinder** | Alertas de orçamento: Budget #1 custo total (80% WARNING, 100% CRITICAL), Budget #2 EC2+RDS (70% WARNING para detectar over-provisioning) |
-| **Integração** | SNS WARNING/CRITICAL, Cost Explorer (análise manual), Lambda audit-reporter (custo semanal no relatório) |
-| **Custo mensal** | $0 (até 2 budgets gratuitos) |
+| **Função Wayfinder** | Alertas de orçamento: Budget #1 Cost total (80% WARNING, 100% CRITICAL), Budget #2 EC2+RDS (70% WARNING para detectar over-provisioning) |
+| **Integração** | SNS WARNING/CRITICAL, Cost Explorer (análise manual), Lambda audit-reporter (Cost semanal no relatório) |
+| **Cost mensal** | $0 (até 2 budgets gratuitos) |
 
 ### 3.10 AWS Glue
 
@@ -298,14 +298,14 @@
 | **Função Wayfinder** | Crawler diário (03h UTC) que cataloga CloudTrail logs no Data Catalog do Athena. ETL job semanal para consolidar dados de wearables em Parquet particionado |
 | **Configuração** | Crawler `wayfinder-cloudtrail-crawler`, database `wayfinder_audit`, trigger agendado |
 | **Integração** | S3 (source), Data Catalog (output), Athena (consumidor) |
-| **Custo mensal** | ~$1.50 (1 DPU × 2h/semana) |
+| **Cost mensal** | ~$1.50 (1 DPU × 2h/semana) |
 
 ### 3.11 Amazon SNS  Topics de Notificação
 
-| Topic | Uso | Subscribers | Custo/mês |
+| Topic | Uso | Subscribers | Cost/mês |
 |---|---|---|---|
 | `wayfinder-critical` | Violações CRITICAL + incidentes LGPD | Email DPO + CTO + SecOps + PagerDuty + Slack (Chatbot) | ~$0.10 |
-| `wayfinder-warning` | Violações HIGH + alertas de custo | Email SecOps + Dev Lead + Slack | ~$0.05 |
+| `wayfinder-warning` | Violações HIGH + alertas de Cost | Email SecOps + Dev Lead + Slack | ~$0.05 |
 | `wayfinder-info` | Violações MEDIUM + Config delivery | Email time de engenharia | ~$0.02 |
 
 ### 3.12 Amazon SQS  Dead Letter Queue
@@ -315,7 +315,7 @@
 | **Tier** | Governance |
 | **Função Wayfinder** | DLQ para eventos que falharam no processamento da Lambda compliance-evaluator após 3 tentativas. Preserva eventos para reprocessamento manual sem perda |
 | **Configuração** | Standard queue, MessageRetentionPeriod 7 dias, alarme CloudWatch se profundidade > 10 |
-| **Custo mensal** | ~$0 (< 1M mensagens) |
+| **Cost mensal** | ~$0 (< 1M mensagens) |
 
 ### 3.13 Amazon CloudWatch
 
@@ -324,16 +324,16 @@
 | **Tier** | Governance |
 | **Função Wayfinder** | (1) Log Groups para todas as Lambdas com KMS CMK (WAYFINDER-008); (2) Custom metrics namespace `wayfinder/Compliance`; (3) Dashboard "Wayfinder Command Center"; (4) 13 alarmes; (5) Log Insights queries pré-construídas |
 | **Dashboard widgets** | % Compliant por serviço, violações por severidade 24h/7d/30d, top 5 recursos violadores, MTTR de remediação, status CloudTrail + Config Recorder |
-| **Custo mensal** | ~$25 (prod: logs + metrics + dashboard + alarms) |
+| **Cost mensal** | ~$25 (prod: logs + metrics + dashboard + alarms) |
 
 ### 3.14 AWS X-Ray
 
 | Atributo | Detalhe |
 |---|---|
 | **Tier** | Governance |
-| **Função Wayfinder** | Tracing distribuído nas 4 Lambdas de governança para identificar gargalos e falhas no pipeline de conformidade |
+| **Função Wayfinder** | Tracing distribuído nas 4 Lambdas de governança para identificar gargalos e falhas no pipeline de Compliance |
 | **Configuração** | Sampling: 5% + 100% para erros; trace propagation entre Lambdas via X-Ray SDK |
-| **Custo mensal** | ~$0.50 |
+| **Cost mensal** | ~$0.50 |
 
 ---
 
@@ -357,11 +357,11 @@
 | **Função** | Backup centralizado com Vault Lock para Aurora (diário 35d + semanal 1a + mensal 7a), DynamoDB (diário 35d), EFS (se usado) |
 | **Vault Lock** | COMPLIANCE mode  backup não pode ser deletado antes do período de retenção |
 | **Config Rule** | `backup-plan-min-frequency-and-min-retention-check` |
-| **Custo mensal** | ~$25 (prod, 1TB backup storage) |
+| **Cost mensal** | ~$25 (prod, 1TB backup storage) |
 
 ### 4.3 AWS Organizations + SCPs
 
-| SCP | Efeito | Justificativa |
+| SCP | Efeito | Justification |
 |---|---|---|
 | `deny-root-account-actions` | Bloqueia todas as ações da root account exceto billing | Nenhum humano deve usar root account |
 | `require-mfa-for-console` | Nega console se não tiver MFA | Previne acesso comprometido |
@@ -375,7 +375,7 @@
 |---|---|
 | **Tier** | Supporting |
 | **Função** | Acesso humano com SSO via Google Workspace. Permission sets por função: ReadOnly, Developer, SecOps, DPO, Admin. MFA obrigatório para todos |
-| **Justificativa** | Elimina IAM Users individuais (67 usuários legacy da VitaCore); centraliza auditoria de acesso humano |
+| **Justification** | Elimina IAM Users individuais (67 usuários legacy da VitaCore); centraliza Audit de acesso humano |
 
 ### 4.5 Amazon VPC + VPC Endpoints
 
@@ -384,7 +384,7 @@
 | **CIDR** | 10.0.0.0/16 (prod) / 10.10.0.0/16 (dev) |
 | **Subnets** | Public (ALB, NAT GW): /24 × 2 AZs; Private App (ECS, Lambda): /24 × 2 AZs; Private Data (Aurora, Redis, DynamoDB): /24 × 2 AZs |
 | **VPC Endpoints** | 2 Gateway (S3, DynamoDB  gratuito) + 9 Interface (Config, CloudTrail, CloudWatch, KMS, SNS, SQS, Secrets Manager, ECR, SSM) |
-| **Justificativa** | Lambdas de governança não precisam de NAT GW para acessar APIs AWS  economiza ~$45/mês em prod e mantém tráfego dentro da rede AWS |
+| **Justification** | Lambdas de governança não precisam de NAT GW para acessar APIs AWS  economiza ~$45/mês em prod e mantém tráfego dentro da Network AWS |
 
 ### 4.6 GitHub Actions + CI/CD
 
