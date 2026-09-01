@@ -1,292 +1,173 @@
 ﻿# Wayfinder Cloud
 
-Cloud governance and compliance platform for regulated AWS environments.
+A cloud governance project I built to study AWS architecture through a real problem.
 
 ---
 
-> "As Wayfinders chart precise routes through unknown regions of space,
-> Wayfinder Cloud guides AWS infrastructure through LGPD complexity,
-> ensuring visibility, immutable audit trails, and real-time auto-remediation."
+## Why I built this
+
+I was finishing the AWS Solutions Architect training and had completed 23 hands-on labs.
+Each lab taught one piece: KMS encryption, VPC security groups, event-driven pipelines,
+CloudTrail logging. But none of them asked me to combine everything with a reason behind it.
+
+So I built something that forced me to make real decisions.
+
+The scenario I used: a digital health company called VitaCore Health.
+In March 2026, a developer ran one wrong AWS CLI command.
+An S3 bucket with 2,340 patient imaging reports went public.
+Nobody caught it for 18 days. A patient found their own CT scan via Google.
+The ANPD fine was R$ 420,000. Lost contracts added another R$ 1.6M.
+
+If I had finished this project before March, that would not have happened.
+The rule I call WAYFINDER-002 detects that exact misconfiguration in under 5 minutes
+and fixes it without anyone needing to do anything.
+
+That is the project.
 
 ---
 
-## Overview
+## What it does
 
-Wayfinder Cloud is a cloud governance platform built for AWS environments
-in regulated sectors. The initial focus is **digital health** under
-**LGPD (Brazilian Data Protection Law - Lei 13.709/2018)**.
-
-This project demonstrates a Solutions Architect's ability to:
-
-- Design event-driven architecture for continuous compliance monitoring
-- Connect AWS technical controls to real legal obligations (LGPD)
-- Automate remediation of security deviations without manual intervention
-- Provision infrastructure as code with Terraform following AWS best practices
-- Document every architectural decision with professional ADRs
-
----
-
-## The Business Problem
-
-**VitaCore Health** is a fictional digital health startup processing
-electronic medical records, imaging reports, and wearable data for
-127,000 active patients across three Brazilian states.
-
-**The March 2026 Incident:**
-
-A junior developer accidentally disabled Block Public Access on the wrong
-S3 bucket while configuring a static website. A bucket containing
-2,340 imaging reports became publicly accessible. Nobody noticed for 18 days.
-A patient discovered their own CT scan result via Google.
-
-**Financial impact: R$ 2,107,000 in fines and lost contracts.**
-
-| | Without Wayfinder | With Wayfinder |
-|---|---|---|
-| Time to detect | 18 days | under 5 minutes |
-| Auto-remediation | None | Yes (Block Public Access) |
-| Audit trail | Unavailable | Immutable for 5 years |
-| ANPD notification | 67 days late | Pre-filled template ready in 48h |
-| Financial impact | R$ 2,107,000 | R$ 0 |
-
----
-
-## Architecture
+Wayfinder Cloud continuously monitors an AWS account for security and compliance
+violations, maps each violation to a LGPD article, auto-remediates the ones that
+are safe to fix automatically, and keeps a legally immutable audit trail.
 
 ```
-Internet
+AWS resource changes
     |
-    Route 53 --> CloudFront --> AWS WAF --> ALB
-                                            |
-    +------- VPC 10.0.0.0/16 ------------------------------------------+
-    |                                                                    |
-    |  Public subnets:   ALB, NAT Gateways                              |
-    |                                                                    |
-    |  Private app:      ECS Fargate (VitaCore API)                     |
-    |                    Lambda functions (Wayfinder governance)         |
-    |                    13 VPC Interface Endpoints (no internet for AWS)|
-    |                                                                    |
-    |  Private data:     Aurora MySQL Multi-AZ (patient records)        |
-    |                    ElastiCache Redis (sessions and cache)          |
-    |                    DynamoDB (wearable data and guardrails)         |
-    +--------------------------------------------------------------------+
-
-Compliance pipeline:
-
-    AWS resource changes
-        |
-        v
-    AWS Config (37 rules: 23 managed + 14 custom WAYFINDER-001..014)
-        |
-        v
-    Amazon EventBridge (wayfinder-events bus)
-        |
-        +---> Lambda compliance-evaluator --> SNS (CRITICAL / WARNING / INFO)
-        |                                 --> Lambda auto-remediation
-        |
-        +---> CloudTrail --> S3 Object Lock --> Glue --> Athena
-        |
-        +---> GuardDuty + Security Hub (FSBP + CIS 1.4)
+    v
+AWS Config evaluates 37 rules (23 AWS managed + 14 I wrote)
+    |
+    v
+EventBridge routes the violation by severity
+    |
+    +---> Lambda compliance-evaluator
+              |
+              +---> SNS alert (email + Slack)
+              |
+              +---> Lambda auto-remediation (for reversible violations)
+              |
+              +---> CloudTrail --> S3 Object Lock --> Athena
+                    (immutable audit trail, queryable with SQL)
 ```
 
 ---
 
-## LGPD Controls Mapping
+## The 14 custom rules I wrote (WAYFINDER series)
 
-Each AWS technical control is mapped to a specific LGPD article.
+Each one was written for a specific LGPD requirement.
+I did not start from the AWS service. I started from what the law requires.
 
-| LGPD Article | Obligation | AWS Control |
+| Rule | What it catches | LGPD article |
 |---|---|---|
-| Art. 6, IV - Necessity | Minimum necessary access only | IAM Least Privilege, SCPs |
-| Art. 37 - Records | Log all data processing operations | CloudTrail multi-region + S3 data events |
-| Art. 46 - Security | Technical protection measures | KMS CMK, 37 Config Rules, WAF |
-| Art. 48 - Incident notification | Notify ANPD within 72 hours | SNS + Lambda, alert in under 5 min |
-| Art. 49 - Secure systems | Security by design, not added later | IaC-only provisioning, WAYFINDER rules |
-| Art. 50 - Best practices | Documented governance program | Security Hub FSBP + CIS 1.4 |
+| WAYFINDER-001 | S3 bucket with health data and no KMS CMK | Art. 46 |
+| WAYFINDER-002 | S3 bucket with health data and public access on | Art. 46 |
+| WAYFINDER-003 | CloudTrail disabled (happened for 43 days at VitaCore) | Art. 37, 48 |
+| WAYFINDER-004 | RDS instance without encryption at rest | Art. 46 |
+| WAYFINDER-005 | IAM policy with Action:* and Resource:* | Art. 6, 47 |
+| WAYFINDER-006 | EC2 with health data tag sitting in a public subnet | Art. 46, 49 |
+| WAYFINDER-007 | Lambda env variable that looks like a hardcoded password | Art. 46 |
+| WAYFINDER-008 | CloudWatch log group without KMS encryption | Art. 46 |
+| WAYFINDER-009 | Security Group with SSH or RDP open to 0.0.0.0/0 | Art. 46 |
+| WAYFINDER-010 | DynamoDB table without encryption | Art. 46 |
+| WAYFINDER-011 | ECS task definition with privileged=true | Art. 49 |
+| WAYFINDER-012 | IAM access key older than 90 days | Art. 47 |
+| WAYFINDER-013 | S3 without Object Lock when retention tag is set | CFM + Art. 37 |
+| WAYFINDER-014 | Resource with health data tag but no Secrets Manager reference | Art. 46 |
 
-Full mapping: [docs/compliance/lgpd-controls-mapping.md](docs/compliance/lgpd-controls-mapping.md)
-
----
-
-## The 14 WAYFINDER Rules
-
-Custom AWS Config Rules built specifically for VitaCore's compliance requirements.
-
-| Rule | Description | Auto-fix |
-|---|---|---|
-| WAYFINDER-001 | S3 health data without KMS CMK encryption | Yes |
-| WAYFINDER-002 | S3 health data with public access enabled (March incident direct cause) | Yes |
-| WAYFINDER-003 | CloudTrail disabled (was off for 43 days unnoticed at VitaCore) | Yes |
-| WAYFINDER-004 | RDS without encryption at rest | No |
-| WAYFINDER-005 | IAM with admin permissions (Action: *) | No |
-| WAYFINDER-006 | EC2 with health data in public subnet | Yes |
-| WAYFINDER-007 | Credentials pattern found in Lambda environment variables | No |
-| WAYFINDER-008 | CloudWatch Logs without KMS encryption | Yes |
-| WAYFINDER-009 | Security Group with SSH or RDP open to internet | Yes |
-| WAYFINDER-010 | DynamoDB without encryption at rest | No |
-| WAYFINDER-011 | ECS Task with privileged=true | No |
-| WAYFINDER-012 | IAM Access Key older than 90 days without rotation | No |
-| WAYFINDER-013 | S3 without Object Lock for legally required retention data | No |
-| WAYFINDER-014 | Secrets Manager not used (possible hardcoded credentials) | No |
+Rules that auto-remediate: 001, 002, 003, 006, 008, 009.
+The rest send an alert. Auto-remediating IAM permissions or RDS encryption
+without human review can cause worse problems than the original violation.
+I documented that reasoning in ADR-004.
 
 ---
 
-## AWS Well-Architected Review
+## Architecture decisions I had to make
 
-Scored against the AWS Well-Architected Framework 2024 (6 pillars).
+Every major decision is in a separate file under docs/adr/.
+Short version of the nine decisions:
 
-| Pillar | Score | Status |
-|---|---|---|
-| Operational Excellence | 72/100 | Good |
-| Security | 85/100 | Strong |
-| Reliability | 70/100 | Good |
-| Performance Efficiency | 68/100 | Good |
-| Cost Optimization | 80/100 | Strong |
-| Sustainability | 45/100 | In development |
+**Why Terraform and not CDK:** CDK generates CloudFormation under the hood.
+I wanted to understand what is actually deployed, not what an abstraction generates.
+Also shows up in more PJ job listings in Brazil.
 
-Full review: [docs/architecture/well-architected-review.md](docs/architecture/well-architected-review.md)
+**Why event-driven and not scheduled polling:** A scheduled Lambda running every
+5 minutes would cost more and detect violations up to 5 minutes late.
+EventBridge reacts to the actual change within seconds.
 
----
+**Why S3 Object Lock in COMPLIANCE mode:** Brazilian law (CFM 1821/2007) requires
+medical records to be kept for 20 years. COMPLIANCE mode means not even the
+AWS root account can delete those logs before the period expires.
+GOVERNANCE mode can be bypassed by admins. That is not good enough.
 
-## Technology Stack
+**Why VPC Endpoints instead of just NAT Gateway:** The Lambda functions talk to
+KMS, CloudTrail, and Config constantly. With NAT Gateway, that traffic goes through
+the public internet before TLS encrypts it. With VPC Endpoints, it stays inside
+the AWS network the entire time. For health data that is the right call.
 
-```
-IaC:       Terraform >= 1.6  (remote state: S3 + DynamoDB lock)
-Runtime:   Python 3.12       (Lambdas with type hints, structured logging, X-Ray)
-CI/CD:     GitHub Actions    (plan on PR, apply on merge, manual approval for prod)
-Docs:      Markdown + ADRs + Mermaid diagrams + Operational Runbooks
-```
+**Why selective auto-remediation:** I almost built full auto-remediation for everything.
+Then I thought through: what if the Lambda removes an IAM permission that a medical
+record system depends on? A doctor cannot log in. That is a different kind of incident.
+So I wrote a decision matrix based on reversibility without operational impact.
 
----
-
-## Repository Structure
-
-```
-wayfinder-cloud/
-+-- README.md
-+-- CONTRIBUTING.md
-+-- LICENSE
-+--
-+-- docs/
-|   +-- adr/                          # 9 Architecture Decision Records
-|   +-- architecture/
-|   |   +-- architecture-overview.md  # Full Mermaid diagram and data flows
-|   |   +-- well-architected-review.md
-|   |   +-- service-catalog.md        # 35+ AWS services with technical justification
-|   +-- compliance/
-|   |   +-- lgpd-controls-mapping.md  # LGPD articles mapped to AWS controls
-|   +-- business/
-|   |   +-- vitacore-scenario.md      # Full incident post-mortem and business context
-|   +-- runbooks/
-|       +-- RB-001-incident-response.md
-|       +-- RB-002-terraform-operations.md
-|       +-- RB-003-compliance-queries.md
-|       +-- RB-004-guardduty-findings.md
-|       +-- RB-005-cost-governance.md
-|
-+-- infra/
-|   +-- modules/                      # 8 reusable Terraform modules
-|   |   +-- networking/               # VPC, subnets, NAT, VPC Endpoints
-|   |   +-- iam/                      # Roles with least privilege per function
-|   |   +-- storage/                  # KMS CMK + S3 with Object Lock
-|   |   +-- notifications/            # SNS Topics + AWS Chatbot Slack
-|   |   +-- compliance/               # Config Recorder + 37 Rules
-|   |   +-- observability/            # CloudTrail, EventBridge, Lambda, CloudWatch
-|   |   +-- remediation/              # Auto-remediation Lambda + DynamoDB guardrail
-|   |   +-- security/                 # GuardDuty, Security Hub, Inspector, Budgets
-|   +-- environments/
-|       +-- dev/                      # Object Lock GOVERNANCE, force_destroy=true
-|       +-- prod/                     # Object Lock COMPLIANCE, manual approval required
-|
-+-- src/
-|   +-- lambdas/
-|   |   +-- compliance-evaluator/     # Evaluates events and adds LGPD context
-|   |   +-- auto-remediation/         # Executes fixes with guardrails
-|   |   +-- incident-notifier/        # Formats and sends Slack and email alerts
-|   |   +-- audit-reporter/           # Weekly Athena queries and reports
-|   +-- tests/
-|
-+-- scripts/
-|   +-- bootstrap_state.py            # One-time Terraform state backend setup
-|
-+-- .github/
-    +-- workflows/
-        +-- terraform-plan.yml        # Plan on every PR, posts result as comment
-        +-- terraform-apply.yml       # Deploy pipeline with dev to prod approval gate
-        +-- lambda-deploy.yml         # Test, package, deploy, smoke test per Lambda
-```
+Full ADRs: docs/adr/
 
 ---
 
-## Architecture Decision Records
-
-Every significant architectural choice is documented with context,
-options considered, the decision made, and trade-offs accepted.
-
-| ADR | Decision | Status |
-|---|---|---|
-| ADR-001 | Terraform over CDK and CloudFormation | Accepted |
-| ADR-002 | Event-driven compliance over periodic polling | Accepted |
-| ADR-003 | S3 Object Lock COMPLIANCE mode + Athena for audit trail | Accepted |
-| ADR-004 | Selective auto-remediation with risk matrix | Accepted |
-| ADR-005 | CloudWatch native over DataDog and New Relic | Accepted |
-| ADR-006 | Security Hub with FSBP and CIS 1.4 standards | Accepted |
-| ADR-007 | Defense in depth with 7 independent security layers | Accepted |
-| ADR-008 | Secrets Manager after hardcoded credentials found post-incident | Accepted |
-| ADR-009 | VPC Endpoints strategy providing 177x security ROI vs NAT-only | Accepted |
-
----
-
-## Quick Start
+## How to run this
 
 ```bash
-# Clone the repository
 git clone https://github.com/guinatural/wayfinder-cloud.git
 cd wayfinder-cloud
 
-# Configure AWS credentials
-aws configure --profile wayfinder-dev
-
-# Bootstrap Terraform state backend (one-time only)
+# First time only: create the S3 bucket and DynamoDB table for Terraform state
 python scripts/bootstrap_state.py --env dev --region us-east-1
 
-# Copy and fill in your variables
+# Copy the example and fill in your email
 cp infra/environments/dev/terraform.tfvars.example \
    infra/environments/dev/terraform.tfvars
 
-# Initialize and apply
 cd infra/environments/dev
 terraform init
 terraform plan
 terraform apply
 ```
 
-Operations guide: [docs/runbooks/RB-002-terraform-operations.md](docs/runbooks/RB-002-terraform-operations.md)
+Detailed walkthrough: docs/runbooks/RB-002-terraform-operations.md
 
 ---
 
-## Cost Estimate
+## Project structure
 
-| Environment | Monthly (USD) |
-|---|---|
-| Dev - governance only | ~$38 |
-| Prod - full VitaCore stack | ~$870 |
-| Annual prevention cost | ~$1,236 |
-| Cost of one similar incident | ~$420,000 |
-| Return on investment | 340x |
+```
+infra/modules/     8 Terraform modules
+infra/environments/dev + prod
+src/lambdas/       4 Python 3.12 functions
+src/tests/         unit tests with moto
+docs/adr/          9 architecture decision records
+docs/runbooks/     5 operational runbooks
+docs/compliance/   LGPD article to AWS control mapping
+docs/business/     VitaCore scenario and incident post-mortem
+.github/workflows/ 3 CI/CD pipelines
+scripts/           bootstrap script for Terraform state
+```
+
+---
+
+## Cost
+
+Dev environment with just the governance layer: about $38/month.
+Full VitaCore production stack: about $870/month.
+One incident like March 2026: R$ 2,107,000.
 
 ---
 
 ## Author
 
-**Guilherme Barreto Gomes**
-
-AWS Solutions Architect | Cloud Security | LGPD
+Guilherme Barreto Gomes
 
 [GitHub](https://github.com/guinatural)
 
 ---
 
-## License
-
-MIT - see [LICENSE](LICENSE) for details.
+MIT License
