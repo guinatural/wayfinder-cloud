@@ -1,4 +1,4 @@
-﻿# Wayfinder Cloud
+# Wayfinder Cloud
 
 A cloud governance project I built to study AWS architecture through a real problem.
 
@@ -32,23 +32,44 @@ Wayfinder Cloud continuously monitors an AWS account for security and compliance
 violations, maps each violation to a LGPD article, auto-remediates the ones that
 are safe to fix automatically, and keeps a legally immutable audit trail.
 
-```
-AWS resource changes
-    |
-    v
-AWS Config evaluates 37 rules (23 AWS managed + 14 I wrote)
-    |
-    v
-EventBridge routes the violation by severity
-    |
-    +---> Lambda compliance-evaluator
-              |
-              +---> SNS alert (email + Slack)
-              |
-              +---> Lambda auto-remediation (for reversible violations)
-              |
-              +---> CloudTrail --> S3 Object Lock --> Athena
-                    (immutable audit trail, queryable with SQL)
+```mermaid
+flowchart TD
+    subgraph "Infrastructure Layer"
+        AWS[AWS Resources\nS3, EC2, RDS, IAM]
+    end
+
+    subgraph "Detection Layer"
+        Config[AWS Config\n37 Evaluated Rules]
+    end
+
+    subgraph "Event & Orchestration Layer"
+        EB{Amazon EventBridge\nEvent Bus}
+    end
+
+    subgraph "Remediation & Alerting Layer"
+        EvalLambda[AWS Lambda\nCompliance Evaluator]
+        AutoRemLambda[AWS Lambda\nAuto-Remediation]
+        SNS[Amazon SNS\nAlerts: Slack/Email]
+    end
+
+    subgraph "Immutable Audit & O11y (LGPD/CFM)"
+        CT[AWS CloudTrail]
+        S3Lock[(Amazon S3\nObject Lock - Compliance Mode)]
+        Athena[Amazon Athena\nSQL Query Engine]
+    end
+
+    AWS -->|Configuration Changes| Config
+    Config -->|State Change Event| EB
+    
+    EB -->|Trigger| EvalLambda
+    EvalLambda -->|Violation Detected| SNS
+    EvalLambda -->|Eligible for Fix| AutoRemLambda
+    
+    AutoRemLambda -->|Remediate| AWS
+    
+    AWS -->|API Actions| CT
+    CT -->|Write Logs| S3Lock
+    S3Lock <-->|Query Compliance| Athena
 ```
 
 ---
