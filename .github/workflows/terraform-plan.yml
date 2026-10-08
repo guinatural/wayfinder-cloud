@@ -1,4 +1,4 @@
-﻿name: Terraform Plan
+name: Terraform Plan
 
 on:
   pull_request:
@@ -7,12 +7,26 @@ on:
       - 'infra/**'
 
 permissions:
+  id-token: write # Necessário para autenticação AWS OIDC (Zero Trust)
   contents: read
   pull-requests: write
 
 jobs:
+  security-scan:
+    name: Security Scan (tfsec)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-pr-commenter-action@v1.2.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          working_directory: infra
+
   terraform-plan:
-    name: Terraform Plan  dev
+    name: Terraform Plan
+    needs: security-scan
     runs-on: ubuntu-latest
 
     defaults:
@@ -28,12 +42,11 @@ jobs:
         with:
           terraform_version: "~1.6"
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            us-east-1
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
 
       - name: Terraform Init
         run: terraform init -reconfigure
@@ -66,5 +79,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `##  Terraform Plan  dev\n\`\`\`hcl\n${truncated}\n\`\`\``
+              body: `## Terraform Plan \n\`\`\`hcl\n${truncated}\n\`\`\``
             });
