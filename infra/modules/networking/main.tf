@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Módulo: networking
 # Responsabilidade: VPC, subnets, NAT, VPC Endpoints, Security Group para Lambdas
 ################################################################################
@@ -176,15 +176,15 @@ resource "aws_vpc_endpoint" "dynamodb" {
 # Interface Endpoints (com custo, mas eliminam dependência do NAT para APIs críticas)
 locals {
   interface_endpoints = {
-    "config"      = "com.amazonaws.${var.region}.config"
-    "cloudtrail"  = "com.amazonaws.${var.region}.cloudtrail"
-    "logs"        = "com.amazonaws.${var.region}.logs"
-    "monitoring"  = "com.amazonaws.${var.region}.monitoring"
-    "kms"         = "com.amazonaws.${var.region}.kms"
-    "sns"         = "com.amazonaws.${var.region}.sns"
-    "sts"         = "com.amazonaws.${var.region}.sts"
-    "events"      = "com.amazonaws.${var.region}.events"
-    "lambda"      = "com.amazonaws.${var.region}.lambda"
+    "config"     = "com.amazonaws.${var.region}.config"
+    "cloudtrail" = "com.amazonaws.${var.region}.cloudtrail"
+    "logs"       = "com.amazonaws.${var.region}.logs"
+    "monitoring" = "com.amazonaws.${var.region}.monitoring"
+    "kms"        = "com.amazonaws.${var.region}.kms"
+    "sns"        = "com.amazonaws.${var.region}.sns"
+    "sts"        = "com.amazonaws.${var.region}.sts"
+    "events"     = "com.amazonaws.${var.region}.events"
+    "lambda"     = "com.amazonaws.${var.region}.lambda"
   }
 }
 

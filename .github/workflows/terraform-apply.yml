@@ -85,7 +85,7 @@ jobs:
       - name: Configure AWS Credentials (dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: \${{ secrets.AWS_OIDC_ROLE_ARN_DEV }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN_DEV }}
           
           aws-region:            us-east-1
 
@@ -173,7 +173,7 @@ jobs:
       - name: Configure AWS Credentials (prod)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: \${{ secrets.AWS_OIDC_ROLE_ARN_DEV }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN_PROD }}
           
           aws-region:            us-east-1
 

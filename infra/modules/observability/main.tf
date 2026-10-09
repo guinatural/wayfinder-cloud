@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Módulo: observability
 # Responsabilidade: CloudTrail, EventBridge, Lambdas, CloudWatch, Athena
 ################################################################################
@@ -262,7 +262,7 @@ resource "aws_lambda_function" "compliance_evaluator" {
       CRITICAL_TOPIC_ARN       = var.critical_topic_arn
       WARNING_TOPIC_ARN        = var.warning_topic_arn
       INFO_TOPIC_ARN           = var.info_topic_arn
-      WAYFINDER_EVENT_BUS_NAME  = aws_cloudwatch_event_bus.wayfinder.name
+      WAYFINDER_EVENT_BUS_NAME = aws_cloudwatch_event_bus.wayfinder.name
       ENVIRONMENT              = var.environment
     }
   }
@@ -308,11 +308,11 @@ resource "aws_lambda_function" "audit_reporter" {
 
   environment {
     variables = {
-      AUDIT_BUCKET_NAME  = var.audit_bucket_id
-      ATHENA_WORKGROUP   = aws_athena_workgroup.wayfinder.name
-      ATHENA_DATABASE    = aws_glue_catalog_database.wayfinder_audit.name
-      INFO_TOPIC_ARN     = var.info_topic_arn
-      ENVIRONMENT        = var.environment
+      AUDIT_BUCKET_NAME = var.audit_bucket_id
+      ATHENA_WORKGROUP  = aws_athena_workgroup.wayfinder.name
+      ATHENA_DATABASE   = aws_glue_catalog_database.wayfinder_audit.name
+      INFO_TOPIC_ARN    = var.info_topic_arn
+      ENVIRONMENT       = var.environment
     }
   }
 
@@ -430,13 +430,13 @@ resource "aws_cloudwatch_dashboard" "wayfinder" {
   dashboard_body = jsonencode({
     widgets = [
       {
-        type       = "metric"
-        x          = 0
-        y          = 0
-        width      = 12
-        height     = 6
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 12
+        height = 6
         properties = {
-          title   = "Compliance Score (menor = mais crítico)"
+          title = "Compliance Score (menor = mais crítico)"
           metrics = [
             ["wayfinder/Compliance", "ComplianceScore", "Environment", var.environment]
           ]
@@ -447,17 +447,17 @@ resource "aws_cloudwatch_dashboard" "wayfinder" {
         }
       },
       {
-        type       = "metric"
-        x          = 12
-        y          = 0
-        width      = 12
-        height     = 6
+        type   = "metric"
+        x      = 12
+        y      = 0
+        width  = 12
+        height = 6
         properties = {
           title = "Recursos NON_COMPLIANT por Severidade"
           metrics = [
             ["wayfinder/Compliance", "NonCompliantResource", "Severity", "CRITICAL", "Environment", var.environment],
-            ["wayfinder/Compliance", "NonCompliantResource", "Severity", "HIGH",     "Environment", var.environment],
-            ["wayfinder/Compliance", "NonCompliantResource", "Severity", "MEDIUM",   "Environment", var.environment],
+            ["wayfinder/Compliance", "NonCompliantResource", "Severity", "HIGH", "Environment", var.environment],
+            ["wayfinder/Compliance", "NonCompliantResource", "Severity", "MEDIUM", "Environment", var.environment],
           ]
           period = 3600
           stat   = "Sum"
@@ -466,17 +466,17 @@ resource "aws_cloudwatch_dashboard" "wayfinder" {
         }
       },
       {
-        type       = "metric"
-        x          = 0
-        y          = 6
-        width      = 12
-        height     = 6
+        type   = "metric"
+        x      = 0
+        y      = 6
+        width  = 12
+        height = 6
         properties = {
           title = "Tentativas de Remediação Automática"
           metrics = [
-            ["wayfinder/Remediation", "RemediationAttempt", "Status", "success",   "Environment", var.environment],
-            ["wayfinder/Remediation", "RemediationAttempt", "Status", "error",     "Environment", var.environment],
-            ["wayfinder/Remediation", "RemediationAttempt", "Status", "skipped",   "Environment", var.environment],
+            ["wayfinder/Remediation", "RemediationAttempt", "Status", "success", "Environment", var.environment],
+            ["wayfinder/Remediation", "RemediationAttempt", "Status", "error", "Environment", var.environment],
+            ["wayfinder/Remediation", "RemediationAttempt", "Status", "skipped", "Environment", var.environment],
           ]
           period = 3600
           stat   = "Sum"
@@ -485,17 +485,17 @@ resource "aws_cloudwatch_dashboard" "wayfinder" {
         }
       },
       {
-        type       = "metric"
-        x          = 12
-        y          = 6
-        width      = 12
-        height     = 6
+        type   = "metric"
+        x      = 12
+        y      = 6
+        width  = 12
+        height = 6
         properties = {
           title = "Lambda Errors  compliance-evaluator"
           metrics = [
-            ["AWS/Lambda", "Errors",      "FunctionName", aws_lambda_function.compliance_evaluator.function_name],
+            ["AWS/Lambda", "Errors", "FunctionName", aws_lambda_function.compliance_evaluator.function_name],
             ["AWS/Lambda", "Invocations", "FunctionName", aws_lambda_function.compliance_evaluator.function_name],
-            ["AWS/Lambda", "Duration",    "FunctionName", aws_lambda_function.compliance_evaluator.function_name],
+            ["AWS/Lambda", "Duration", "FunctionName", aws_lambda_function.compliance_evaluator.function_name],
           ]
           period = 300
           stat   = "Sum"

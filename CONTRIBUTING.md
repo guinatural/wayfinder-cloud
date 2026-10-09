@@ -123,10 +123,16 @@ structure must be documented as an ADR before implementation.
 
 1. Create a branch from `main` with a descriptive name
 2. Follow the naming conventions and commit format above
-3. Run `terraform validate` for any infrastructure changes
-4. Run tests: `pytest src/tests/`
+3. Run `terraform fmt -check -recursive infra` for infrastructure changes. To validate
+   without AWS credentials or the remote state backend, run:
+   `terraform -chdir=infra/environments/dev init -backend=false -input=false -lockfile=readonly`
+   followed by `terraform -chdir=infra/environments/dev validate` (repeat for `prod`).
+4. Install test dependencies and run the test suite:
+   `python -m pip install pytest pytest-cov boto3 "moto[all]"`
+   `python -m pytest src/ --cov=src --cov-report=term-missing -v`
 5. Open a PR with a clear description of what changes and why
-6. Wait for the automated `terraform plan` comment on the PR
+6. Wait for the CI checks and, when AWS OIDC is configured for the repository,
+   the automated `terraform plan` comment on the PR
 7. Request review if the change affects security or compliance controls
 
 ---

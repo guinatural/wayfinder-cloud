@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Módulo: security
 # Responsabilidade: GuardDuty, Security Hub, Inspector v2, Budgets,
 #                   integração EventBridge  Lambda para findings de ameaça
@@ -21,10 +21,10 @@ resource "aws_guardduty_detector" "wayfinder" {
 
   datasources {
     s3_logs {
-      enable = true  # Monitora acesso anômalo a S3  crítico pós-incidente de março
+      enable = true # Monitora acesso anômalo a S3  crítico pós-incidente de março
     }
     kubernetes {
-      audit_logs { enable = false }  # EKS não usado na VitaCore
+      audit_logs { enable = false } # EKS não usado na VitaCore
     }
     malware_protection {
       scan_ec2_instance_with_findings {
@@ -34,10 +34,10 @@ resource "aws_guardduty_detector" "wayfinder" {
   }
 
   tags = {
-    Name           = "${local.name_prefix}-guardduty"
-    Environment    = var.environment
-    Project        = "wayfinder-cloud"
-    ManagedBy      = "terraform"
+    Name               = "${local.name_prefix}-guardduty"
+    Environment        = var.environment
+    Project            = "wayfinder-cloud"
+    ManagedBy          = "terraform"
     DataClassification = "operational"
   }
 }
@@ -47,16 +47,9 @@ resource "aws_guardduty_detector" "wayfinder" {
 ################################################################################
 
 resource "aws_securityhub_account" "wayfinder" {
-  enable_default_standards = false  # Habilitamos standards individualmente abaixo
+  enable_default_standards = false # Habilitamos standards individualmente abaixo
 
-  auto_enable_controls = true  # Habilita novos controles automaticamente
-
-  tags = {
-    Name        = "${local.name_prefix}-securityhub"
-    Environment = var.environment
-    Project     = "wayfinder-cloud"
-    ManagedBy   = "terraform"
-  }
+  auto_enable_controls = true # Habilita novos controles automaticamente
 }
 
 # AWS Foundational Security Best Practices v1.0.0
@@ -79,9 +72,9 @@ resource "aws_securityhub_standards_subscription" "cis_v14" {
 
 resource "aws_inspector2_enabler" "wayfinder" {
   account_ids    = [var.account_id]
-  resource_types = ["EC2", "ECR"]  # Scan de vulnerabilidades em instâncias e imagens
+  resource_types = ["EC2", "ECR"] # Scan de vulnerabilidades em instâncias e imagens
 
-  depends_on = [aws_securityhub_account.wayfinder]  # Inspector integra com Security Hub
+  depends_on = [aws_securityhub_account.wayfinder] # Inspector integra com Security Hub
 }
 
 ################################################################################
@@ -97,28 +90,28 @@ resource "aws_budgets_budget" "monthly_total" {
   time_unit    = "MONTHLY"
 
   notification {
-    comparison_operator        = "GREATER_THAN"
-    threshold                  = 80
-    threshold_type             = "PERCENTAGE"
-    notification_type          = "ACTUAL"
-    subscriber_sns_topic_arns  = [var.warning_topic_arn]
+    comparison_operator       = "GREATER_THAN"
+    threshold                 = 80
+    threshold_type            = "PERCENTAGE"
+    notification_type         = "ACTUAL"
+    subscriber_sns_topic_arns = [var.warning_topic_arn]
   }
 
   notification {
-    comparison_operator        = "GREATER_THAN"
-    threshold                  = 100
-    threshold_type             = "PERCENTAGE"
-    notification_type          = "ACTUAL"
-    subscriber_sns_topic_arns  = [var.critical_topic_arn]
+    comparison_operator       = "GREATER_THAN"
+    threshold                 = 100
+    threshold_type            = "PERCENTAGE"
+    notification_type         = "ACTUAL"
+    subscriber_sns_topic_arns = [var.critical_topic_arn]
   }
 
   # Alerta proativo: projeção de 120% indica que o budget será estourado
   notification {
-    comparison_operator        = "GREATER_THAN"
-    threshold                  = 120
-    threshold_type             = "PERCENTAGE"
-    notification_type          = "FORECASTED"
-    subscriber_sns_topic_arns  = [var.warning_topic_arn]
+    comparison_operator       = "GREATER_THAN"
+    threshold                 = 120
+    threshold_type            = "PERCENTAGE"
+    notification_type         = "FORECASTED"
+    subscriber_sns_topic_arns = [var.warning_topic_arn]
   }
 
   tags = {
@@ -133,7 +126,7 @@ resource "aws_budgets_budget" "monthly_total" {
 resource "aws_budgets_budget" "compute_database" {
   name         = "${local.name_prefix}-compute-database-budget"
   budget_type  = "COST"
-  limit_amount = tostring(tonumber(var.monthly_budget_limit) * 0.6)  # 60% do total
+  limit_amount = tostring(tonumber(var.monthly_budget_limit) * 0.6) # 60% do total
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
@@ -226,7 +219,7 @@ resource "aws_cloudwatch_event_rule" "securityhub_critical" {
           Label = ["CRITICAL", "HIGH"]
         }
         Workflow = {
-          Status = ["NEW"]  # Apenas novos findings, não os já em tratamento
+          Status = ["NEW"] # Apenas novos findings, não os já em tratamento
         }
       }
     }

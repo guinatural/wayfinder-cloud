@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Módulo: compliance
 # Responsabilidade: AWS Config Recorder, Delivery Channel, Rules (managed + custom)
 # Projeto: Wayfinder Cloud  VitaCore Health
@@ -14,36 +14,36 @@ locals {
   # ---------------------------------------------------------------------------
   managed_rules = {
     # Auditoria e trilha (LGPD art. 37)
-    "cloud-trail-enabled"                          = "CLOUD_TRAIL_ENABLED"
-    "cloudtrail-s3-dataevents-enabled"             = "CLOUDTRAIL_S3_DATAEVENTS_ENABLED"
+    "cloud-trail-enabled"              = "CLOUD_TRAIL_ENABLED"
+    "cloudtrail-s3-dataevents-enabled" = "CLOUDTRAIL_S3_DATAEVENTS_ENABLED"
     # Criptografia (LGPD art. 46)
-    "encrypted-volumes"                            = "ENCRYPTED_VOLUMES"
-    "rds-storage-encrypted"                        = "RDS_STORAGE_ENCRYPTED"
+    "encrypted-volumes"     = "ENCRYPTED_VOLUMES"
+    "rds-storage-encrypted" = "RDS_STORAGE_ENCRYPTED"
     # S3 proteção pública (LGPD art. 46)
-    "s3-bucket-public-read-prohibited"             = "S3_BUCKET_PUBLIC_READ_PROHIBITED"
-    "s3-bucket-public-write-prohibited"            = "S3_BUCKET_PUBLIC_WRITE_PROHIBITED"
-    "s3-bucket-server-side-encryption-enabled"     = "S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED"
+    "s3-bucket-public-read-prohibited"         = "S3_BUCKET_PUBLIC_READ_PROHIBITED"
+    "s3-bucket-public-write-prohibited"        = "S3_BUCKET_PUBLIC_WRITE_PROHIBITED"
+    "s3-bucket-server-side-encryption-enabled" = "S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED"
     # IAM e identidade (LGPD art. 47)
-    "iam-root-access-key-check"                    = "IAM_ROOT_ACCESS_KEY_CHECK"
-    "mfa-enabled-for-iam-console-access"           = "MFA_ENABLED_FOR_IAM_CONSOLE_ACCESS"
-    "iam-no-inline-policy-check"                   = "IAM_NO_INLINE_POLICY_CHECK"
+    "iam-root-access-key-check"          = "IAM_ROOT_ACCESS_KEY_CHECK"
+    "mfa-enabled-for-iam-console-access" = "MFA_ENABLED_FOR_IAM_CONSOLE_ACCESS"
+    "iam-no-inline-policy-check"         = "IAM_NO_INLINE_POLICY_CHECK"
     # Rede (LGPD art. 46)
-    "vpc-flow-logs-enabled"                        = "VPC_FLOW_LOGS_ENABLED"
+    "vpc-flow-logs-enabled" = "VPC_FLOW_LOGS_ENABLED"
     # Ameaças (LGPD art. 46, 50)
-    "guardduty-enabled-centralized"                = "GUARDDUTY_ENABLED_CENTRALIZED"
-    "securityhub-enabled"                          = "SECURITYHUB_ENABLED"
-    "inspector-ec2-scan-enabled"                   = "INSPECTOR_EC2_SCANNING_ENABLED"
+    "guardduty-enabled-centralized" = "GUARDDUTY_ENABLED_CENTRALIZED"
+    "securityhub-enabled"           = "SECURITYHUB_ENABLED"
+    "inspector-ec2-scan-enabled"    = "INSPECTOR_EC2_SCANNING_ENABLED"
     # Credenciais e rotação (LGPD art. 47)
-    "access-keys-rotated"                          = "ACCESS_KEYS_ROTATED"
-    "iam-password-policy"                          = "IAM_PASSWORD_POLICY"
-    "secretsmanager-rotation-enabled"              = "SECRETSMANAGER_ROTATION_ENABLED_CHECK"
+    "access-keys-rotated"             = "ACCESS_KEYS_ROTATED"
+    "iam-password-policy"             = "IAM_PASSWORD_POLICY"
+    "secretsmanager-rotation-enabled" = "SECRETSMANAGER_ROTATION_ENABLED_CHECK"
     # Rede restrita (LGPD art. 46)
-    "restricted-ssh"                               = "RESTRICTED_INCOMING_TRAFFIC"
-    "restricted-common-ports"                      = "RESTRICTED_COMMON_PORTS"
+    "restricted-ssh"          = "RESTRICTED_INCOMING_TRAFFIC"
+    "restricted-common-ports" = "RESTRICTED_COMMON_PORTS"
     # Dados (LGPD art. 46)
-    "dynamodb-table-encrypted-at-rest"             = "DYNAMODB_TABLE_ENCRYPTED_AT_REST"
-    "elasticache-redis-cluster-automatic-backup"   = "ELASTICACHE_REDIS_CLUSTER_AUTOMATIC_BACKUP_CHECK"
-    "wafv2-webacl-not-empty"                       = "WAFV2_WEBACL_NOT_EMPTY"
+    "dynamodb-table-encrypted-at-rest"           = "DYNAMODB_TABLE_ENCRYPTED_AT_REST"
+    "elasticache-redis-cluster-automatic-backup" = "ELASTICACHE_REDIS_CLUSTER_AUTOMATIC_BACKUP_CHECK"
+    "wafv2-webacl-not-empty"                     = "WAFV2_WEBACL_NOT_EMPTY"
     # Backup (LGPD art. 46)
     "backup-plan-min-frequency-and-min-retention-check" = "BACKUP_PLAN_MIN_FREQUENCY_AND_MIN_RETENTION_CHECK"
   }
@@ -166,7 +166,7 @@ resource "aws_config_config_rule" "custom" {
 
   depends_on = [
     aws_config_configuration_recorder_status.wayfinder,
-    aws_lambda_permission.config_invoke[each.key],
+    aws_lambda_permission.config_invoke,
   ]
 
   tags = {
