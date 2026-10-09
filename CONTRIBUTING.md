@@ -131,8 +131,9 @@ structure must be documented as an ADR before implementation.
    `python -m pip install pytest pytest-cov boto3 "moto[all]"`
    `python -m pytest src/ --cov=src --cov-report=term-missing -v`
 5. Open a PR with a clear description of what changes and why
-6. Wait for the CI checks and, when AWS OIDC is configured for the repository,
-   the automated `terraform plan` comment on the PR
+6. Wait for the Python/Terraform checks and tfsec scan on the PR. Terraform plans,
+   applies, and Lambda deployments are manual `workflow_dispatch` operations; they
+   do not run on pull requests or pushes.
 7. Request review if the change affects security or compliance controls
 
 ---
