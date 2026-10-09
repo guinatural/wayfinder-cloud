@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    name: Python tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install pytest pytest-cov boto3 "moto[all]"
+
+      - name: Run tests
+        run: pytest src/ --cov=src --cov-report=term-missing -v
+
+  terraform:
+    name: Terraform checks (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prod]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.6"
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive infra
+
+      - name: Initialize without remote backend
+        run: terraform init -backend=false -input=false -lockfile=readonly
+        working-directory: infra/environments/${{ matrix.environment }}
+
+      - name: Validate configuration
+        run: terraform validate
+        working-directory: infra/environments/${{ matrix.environment }}

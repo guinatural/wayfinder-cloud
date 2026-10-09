@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Módulo: security  Outputs
 # Projeto: Wayfinder Cloud  VitaCore Health
 ################################################################################
@@ -15,7 +15,7 @@ output "guardduty_detector_arn" {
 
 output "securityhub_arn" {
   description = "ARN da conta Security Hub habilitada. Usado para referenciar o hub em integrações com SIEM e relatórios."
-  value       = aws_securityhub_account.wayfinder.id  # Security Hub retorna account ID como resource ID
+  value       = aws_securityhub_account.wayfinder.id # Security Hub retorna account ID como resource ID
 }
 
 output "securityhub_fsbp_subscription_arn" {

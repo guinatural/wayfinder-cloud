@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Wayfinder Cloud  Environment: dev
 # Orquestra todos os módulos para o ambiente de desenvolvimento
 ################################################################################
@@ -64,9 +64,9 @@ data "aws_region" "current" {}
 module "storage" {
   source = "../../modules/storage"
 
-  environment        = var.environment
-  account_id         = data.aws_caller_identity.current.account_id
-  region             = data.aws_region.current.name
+  environment          = var.environment
+  account_id           = data.aws_caller_identity.current.account_id
+  region               = data.aws_region.current.name
   audit_retention_days = var.audit_retention_days
 }
 
@@ -78,11 +78,11 @@ module "storage" {
 module "iam" {
   source = "../../modules/iam"
 
-  environment        = var.environment
-  account_id         = data.aws_caller_identity.current.account_id
-  region             = data.aws_region.current.name
-  audit_bucket_arn   = module.storage.audit_bucket_arn
-  kms_key_arn        = module.storage.kms_key_arn
+  environment      = var.environment
+  account_id       = data.aws_caller_identity.current.account_id
+  region           = data.aws_region.current.name
+  audit_bucket_arn = module.storage.audit_bucket_arn
+  kms_key_arn      = module.storage.kms_key_arn
 }
 
 ################################################################################
@@ -106,11 +106,11 @@ module "networking" {
 module "notifications" {
   source = "../../modules/notifications"
 
-  environment       = var.environment
-  kms_key_arn       = module.storage.kms_key_arn
-  alert_email       = var.alert_email
+  environment        = var.environment
+  kms_key_arn        = module.storage.kms_key_arn
+  alert_email        = var.alert_email
   slack_workspace_id = var.slack_workspace_id
-  slack_channel_id  = var.slack_channel_id
+  slack_channel_id   = var.slack_channel_id
 }
 
 ################################################################################
@@ -121,15 +121,15 @@ module "notifications" {
 module "compliance" {
   source = "../../modules/compliance"
 
-  environment              = var.environment
-  account_id               = data.aws_caller_identity.current.account_id
-  region                   = data.aws_region.current.name
-  config_bucket_arn        = module.storage.audit_bucket_arn
-  config_bucket_id         = module.storage.audit_bucket_id
-  kms_key_arn              = module.storage.kms_key_arn
-  config_delivery_sns_arn  = module.notifications.info_topic_arn
-  config_role_arn          = module.iam.config_role_arn
-  evaluator_function_arn   = module.observability.compliance_evaluator_arn
+  environment             = var.environment
+  account_id              = data.aws_caller_identity.current.account_id
+  region                  = data.aws_region.current.name
+  config_bucket_arn       = module.storage.audit_bucket_arn
+  config_bucket_id        = module.storage.audit_bucket_id
+  kms_key_arn             = module.storage.kms_key_arn
+  config_delivery_sns_arn = module.notifications.info_topic_arn
+  config_role_arn         = module.iam.config_role_arn
+  evaluator_function_arn  = module.observability.compliance_evaluator_arn
 }
 
 ################################################################################
@@ -140,17 +140,17 @@ module "compliance" {
 module "observability" {
   source = "../../modules/observability"
 
-  environment            = var.environment
-  account_id             = data.aws_caller_identity.current.account_id
-  region                 = data.aws_region.current.name
-  audit_bucket_id        = module.storage.audit_bucket_id
-  audit_bucket_arn       = module.storage.audit_bucket_arn
-  kms_key_arn            = module.storage.kms_key_arn
-  critical_topic_arn     = module.notifications.critical_topic_arn
-  warning_topic_arn      = module.notifications.warning_topic_arn
-  info_topic_arn         = module.notifications.info_topic_arn
-  lambda_role_arn        = module.iam.lambda_evaluator_role_arn
-  lambda_subnet_ids      = module.networking.private_subnet_ids
+  environment              = var.environment
+  account_id               = data.aws_caller_identity.current.account_id
+  region                   = data.aws_region.current.name
+  audit_bucket_id          = module.storage.audit_bucket_id
+  audit_bucket_arn         = module.storage.audit_bucket_arn
+  kms_key_arn              = module.storage.kms_key_arn
+  critical_topic_arn       = module.notifications.critical_topic_arn
+  warning_topic_arn        = module.notifications.warning_topic_arn
+  info_topic_arn           = module.notifications.info_topic_arn
+  lambda_role_arn          = module.iam.lambda_evaluator_role_arn
+  lambda_subnet_ids        = module.networking.private_subnet_ids
   lambda_security_group_id = module.networking.lambda_sg_id
 }
 
@@ -171,7 +171,7 @@ module "remediation" {
   kms_key_arn              = module.storage.kms_key_arn
   critical_topic_arn       = module.notifications.critical_topic_arn
   warning_topic_arn        = module.notifications.warning_topic_arn
-  wayfinder_event_bus_arn   = module.observability.wayfinder_event_bus_arn
+  wayfinder_event_bus_arn  = module.observability.wayfinder_event_bus_arn
 }
 
 ################################################################################

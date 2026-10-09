@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Módulo: notifications
 # Responsabilidade: SNS Topics (CRITICAL/WARNING/INFO), subscriptions, Chatbot
 ################################################################################
@@ -14,19 +14,19 @@ locals {
 resource "aws_sns_topic" "critical" {
   name              = "${local.name_prefix}-critical"
   kms_master_key_id = var.kms_key_arn
-  tags = { Name = "${local.name_prefix}-critical", Severity = "CRITICAL" }
+  tags              = { Name = "${local.name_prefix}-critical", Severity = "CRITICAL" }
 }
 
 resource "aws_sns_topic" "warning" {
   name              = "${local.name_prefix}-warning"
   kms_master_key_id = var.kms_key_arn
-  tags = { Name = "${local.name_prefix}-warning", Severity = "WARNING" }
+  tags              = { Name = "${local.name_prefix}-warning", Severity = "WARNING" }
 }
 
 resource "aws_sns_topic" "info" {
   name              = "${local.name_prefix}-info"
   kms_master_key_id = var.kms_key_arn
-  tags = { Name = "${local.name_prefix}-info", Severity = "INFO" }
+  tags              = { Name = "${local.name_prefix}-info", Severity = "INFO" }
 }
 
 ################################################################################
@@ -150,7 +150,7 @@ resource "aws_chatbot_slack_channel_configuration" "wayfinder" {
 
   configuration_name = "${local.name_prefix}-slack"
   iam_role_arn       = aws_iam_role.chatbot[0].arn
-  slack_workspace_id = var.slack_workspace_id
+  slack_team_id      = var.slack_workspace_id
   slack_channel_id   = var.slack_channel_id
   sns_topic_arns     = [aws_sns_topic.critical.arn, aws_sns_topic.warning.arn]
 

@@ -1,190 +1,88 @@
-name: Terraform Apply
+name: Terraform Manual Plan and Apply
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'infra/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to operate on
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      operation:
+        description: Plan only, or apply the plan created in this run
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+      confirm_apply:
+        description: Required confirmation when operation is apply
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
-  id-token: write   # Necessário para OIDC (melhor prática  sem access keys estáticas)
+  id-token: write
 
 jobs:
-  # 
-  # Stage 1: Plan (sempre executa em push para main)
-  # 
-  plan-dev:
-    name: Plan  dev
+  validate-input:
+    name: Validate manual request
     runs-on: ubuntu-latest
-    environment: dev
+    steps:
+      - name: Require explicit apply confirmation
+        if: inputs.operation == 'apply' && inputs.confirm_apply != true
+        run: |
+          echo "::error::Set confirm_apply to true to run an apply."
+          exit 1
+
+  terraform:
+    name: Terraform ${{ inputs.operation }} (${{ inputs.environment }})
+    needs: validate-input
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment == 'prod' && (inputs.operation == 'apply' && 'prod-approval' || 'prod') || 'dev' }}
+    concurrency:
+      group: terraform-${{ inputs.environment }}
+      cancel-in-progress: false
     defaults:
       run:
-        working-directory: infra/environments/dev
+        working-directory: infra/environments/${{ inputs.environment }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
+      - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.6"
 
-      - name: Configure AWS Credentials (dev)
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN_DEV }}
-          
-          aws-region:            us-east-1
+          role-to-assume: ${{ inputs.environment == 'prod' && secrets.AWS_OIDC_ROLE_ARN_PROD || secrets.AWS_OIDC_ROLE_ARN_DEV }}
+          aws-region: us-east-1
 
-      - name: Terraform Init
-        run: terraform init -reconfigure
+      - name: Initialize Terraform
+        run: terraform init -reconfigure -backend-config="profile="
 
-      - name: Terraform Format Check
-        run: terraform fmt -check -recursive
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infra
+        working-directory: .
 
-      - name: Terraform Validate
+      - name: Validate Terraform configuration
         run: terraform validate
 
-      - name: Terraform Plan (dev)
+      - name: Create Terraform plan
         run: |
           terraform plan \
+            -var="aws_profile=" \
             -var="alert_email=${{ secrets.ALERT_EMAIL }}" \
             -no-color \
-            -out=tfplan-dev
+            -out=tfplan
 
-      - name: Upload plan artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-dev
-          path: infra/environments/dev/tfplan-dev
-          retention-days: 1
-
-  # 
-  # Stage 2: Apply dev (após plan com sucesso)
-  # 
-  apply-dev:
-    name: Apply  dev
-    runs-on: ubuntu-latest
-    environment: dev          # Requer aprovação manual no GitHub Environments
-    needs: plan-dev
-    defaults:
-      run:
-        working-directory: infra/environments/dev
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.6"
-
-      - name: Configure AWS Credentials (dev)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: \${{ secrets.AWS_OIDC_ROLE_ARN_DEV }}
-          
-          aws-region:            us-east-1
-
-      - name: Terraform Init
-        run: terraform init -reconfigure
-
-      - name: Download plan artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-dev
-          path: infra/environments/dev/
-
-      - name: Terraform Apply (dev)
-        run: terraform apply -auto-approve tfplan-dev
-
-  # 
-  # Stage 3: Plan prod (só após apply dev com sucesso)
-  # 
-  plan-prod:
-    name: Plan  prod
-    runs-on: ubuntu-latest
-    environment: prod
-    needs: apply-dev
-    defaults:
-      run:
-        working-directory: infra/environments/prod
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.6"
-
-      - name: Configure AWS Credentials (prod)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN_PROD }}
-          
-          aws-region:            us-east-1
-
-      - name: Terraform Init
-        run: terraform init -reconfigure
-
-      - name: Terraform Validate
-        run: terraform validate
-
-      - name: Terraform Plan (prod)
-        run: |
-          terraform plan \
-            -var="alert_email=${{ secrets.ALERT_EMAIL }}" \
-            -no-color \
-            -out=tfplan-prod
-
-      - name: Upload plan artifact (prod)
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-prod
-          path: infra/environments/prod/tfplan-prod
-          retention-days: 1
-
-  # 
-  # Stage 4: Apply prod (requer aprovação manual)
-  # 
-  apply-prod:
-    name: Apply  prod
-    runs-on: ubuntu-latest
-    environment: prod-approval  # EXIGE aprovação manual no GitHub  Environments
-    needs: plan-prod
-    defaults:
-      run:
-        working-directory: infra/environments/prod
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.6"
-
-      - name: Configure AWS Credentials (prod)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: \${{ secrets.AWS_OIDC_ROLE_ARN_DEV }}
-          
-          aws-region:            us-east-1
-
-      - name: Terraform Init
-        run: terraform init -reconfigure
-
-      - name: Download plan artifact (prod)
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-prod
-          path: infra/environments/prod/
-
-      - name: Terraform Apply (prod)
-        run: terraform apply -auto-approve tfplan-prod
+      - name: Apply Terraform plan
+        if: inputs.operation == 'apply'
+        run: terraform apply -auto-approve tfplan

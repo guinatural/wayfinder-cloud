@@ -1,6 +1,12 @@
 # Wayfinder Cloud
 
-A cloud governance project I built to study AWS architecture through a real problem.
+A portfolio project modeling AWS cloud governance for a healthcare case study.
+
+> **Project status:** This repository contains Terraform configurations, four Python
+> 3.12 Lambda handlers, and 115 unit tests that use AWS mocks. It is not evidence of
+> an AWS deployment, production use, legal compliance, or measured detection/remediation
+> times. The VitaCore story is a fictional scenario; its incident and impact figures
+> are assumptions for the exercise, not a report of a real breach.
 
 ---
 
@@ -12,15 +18,15 @@ CloudTrail logging. But none of them asked me to combine everything with a reaso
 
 So I built something that forced me to make real decisions.
 
-The scenario I used: a digital health company called VitaCore Health.
-In March 2026, a developer ran one wrong AWS CLI command.
+The fictional scenario I used: a digital health company called VitaCore Health.
+In the scenario, a developer runs one wrong AWS CLI command.
 An S3 bucket with 2,340 patient imaging reports went public.
 Nobody caught it for 18 days. A patient found their own CT scan via Google.
 The ANPD fine was R$ 420,000. Lost contracts added another R$ 1.6M.
 
-If I had finished this project before March, that would not have happened.
-The rule I call WAYFINDER-002 detects that exact misconfiguration in under 5 minutes
-and fixes it without anyone needing to do anything.
+Those figures describe the case study only. WAYFINDER-002 is intended to represent
+that misconfiguration; this repository does not demonstrate that it detects or fixes
+it in a deployed AWS account.
 
 That is the project.
 
@@ -28,9 +34,9 @@ That is the project.
 
 ## What it does
 
-Wayfinder Cloud continuously monitors an AWS account for security and compliance
-violations, maps each violation to a LGPD article, auto-remediates the ones that
-are safe to fix automatically, and keeps a legally immutable audit trail.
+The target design is to monitor AWS security and compliance, map violations to LGPD
+articles, remediate selected findings, and retain audit data. The diagram below is an
+architecture proposal, not a verified live system.
 
 ```mermaid
 flowchart TD
@@ -39,7 +45,7 @@ flowchart TD
     end
 
     subgraph "Detection Layer"
-        Config[AWS Config\n37 Evaluated Rules]
+        Config[AWS Config\n23 managed + 14 custom rule declarations]
     end
 
     subgraph "Event & Orchestration Layer"
@@ -74,32 +80,39 @@ flowchart TD
 
 ---
 
-## The 14 custom rules I wrote (WAYFINDER series)
+## WAYFINDER custom-rule catalog: declared, not operational
 
-Each one was written for a specific LGPD requirement.
-I did not start from the AWS service. I started from what the law requires.
+The Terraform module declares all 14 names, but declarations and descriptions are
+not the same as implemented compliance checks.
 
-| Rule | What it catches | LGPD article |
-|---|---|---|
-| WAYFINDER-001 | S3 bucket with health data and no KMS CMK | Art. 46 |
-| WAYFINDER-002 | S3 bucket with health data and public access on | Art. 46 |
-| WAYFINDER-003 | CloudTrail disabled (happened for 43 days at VitaCore) | Art. 37, 48 |
-| WAYFINDER-004 | RDS instance without encryption at rest | Art. 46 |
-| WAYFINDER-005 | IAM policy with Action:* and Resource:* | Art. 6, 47 |
-| WAYFINDER-006 | EC2 with health data tag sitting in a public subnet | Art. 46, 49 |
-| WAYFINDER-007 | Lambda env variable that looks like a hardcoded password | Art. 46 |
-| WAYFINDER-008 | CloudWatch log group without KMS encryption | Art. 46 |
-| WAYFINDER-009 | Security Group with SSH or RDP open to 0.0.0.0/0 | Art. 46 |
-| WAYFINDER-010 | DynamoDB table without encryption | Art. 46 |
-| WAYFINDER-011 | ECS task definition with privileged=true | Art. 49 |
-| WAYFINDER-012 | IAM access key older than 90 days | Art. 47 |
-| WAYFINDER-013 | S3 without Object Lock when retention tag is set | CFM + Art. 37 |
-| WAYFINDER-014 | Resource with health data tag but no Secrets Manager reference | Art. 46 |
+| Rule | Intended check | LGPD article | Current code status |
+|---|---|---|---|
+| WAYFINDER-001 | S3 bucket with health data and no KMS CMK | Art. 46 | Terraform declaration and action metadata only |
+| WAYFINDER-002 | S3 bucket with health data and public access on | Art. 46 | Terraform declaration and action metadata only |
+| WAYFINDER-003 | CloudTrail disabled | Art. 37, 48 | Terraform declaration and action metadata only |
+| WAYFINDER-004 | RDS instance without encryption at rest | Art. 46 | Terraform declaration and severity metadata only |
+| WAYFINDER-005 | IAM policy with Action:* and Resource:* | Art. 6, 47 | Terraform declaration and severity metadata only |
+| WAYFINDER-006 | EC2 with health data tag in a public subnet | Art. 46, 49 | Terraform declaration and log-only action |
+| WAYFINDER-007 | Lambda environment variable that looks like a hardcoded password | Art. 46 | Terraform declaration only |
+| WAYFINDER-008 | CloudWatch log group without KMS encryption | Art. 46 | Terraform declaration only |
+| WAYFINDER-009 | Security Group with SSH or RDP open to 0.0.0.0/0 | Art. 46 | Terraform declaration only |
+| WAYFINDER-010 | DynamoDB table without encryption | Art. 46 | Terraform declaration only |
+| WAYFINDER-011 | ECS task definition with privileged=true | Art. 49 | Terraform declaration only |
+| WAYFINDER-012 | IAM access key older than 90 days | Art. 47 | Terraform declaration only |
+| WAYFINDER-013 | S3 without Object Lock when retention tag is set | CFM + Art. 37 | Terraform declaration only |
+| WAYFINDER-014 | Resource with health data tag but no Secrets Manager reference | Art. 46 | Terraform declaration only |
 
-Rules that auto-remediate: 001, 002, 003, 006, 008, 009.
-The rest send an alert. Auto-remediating IAM permissions or RDS encryption
-without human review can cause worse problems than the original violation.
-I documented that reasoning in ADR-004.
+All 14 names are declared as `CUSTOM_LAMBDA` rules in Terraform, but the Lambda
+does not implement AWS Config's custom-rule invocation contract (`PutEvaluations`).
+It currently parses EventBridge compliance-change events instead. The Python rule
+metadata covers only 001–006, and Terraform prefixes rule names with the environment
+while the metadata map uses unprefixed names. Consequently, none of these 14 checks
+is implemented end to end; this table is a design catalog, not control coverage.
+
+The remediation dispatcher contains actions for 001–003 and a log-only placeholder
+for 006. The exemption check, attempt-limit check, and attempt recording are no-op
+stubs. Do not treat automatic remediation or its guardrails as operational; the
+remaining controls are roadmap items. See ADR-004 for the intended safety rationale.
 
 ---
 
@@ -116,20 +129,20 @@ Also shows up in more PJ job listings in Brazil.
 5 minutes would cost more and detect violations up to 5 minutes late.
 EventBridge reacts to the actual change within seconds.
 
-**Why S3 Object Lock in COMPLIANCE mode:** Brazilian law (CFM 1821/2007) requires
-medical records to be kept for 20 years. COMPLIANCE mode means not even the
-AWS root account can delete those logs before the period expires.
-GOVERNANCE mode can be bypassed by admins. That is not good enough.
+**Object Lock design:** Terraform configures COMPLIANCE mode in prod and GOVERNANCE
+mode in dev. The current prod example defaults to 365 days, not 20 years. This
+configuration does not establish compliance with CFM 1821/2007; retention needs
+legal review and a separately verified value before making a compliance claim.
 
-**Why VPC Endpoints instead of just NAT Gateway:** The Lambda functions talk to
-KMS, CloudTrail, and Config constantly. With NAT Gateway, that traffic goes through
-the public internet before TLS encrypts it. With VPC Endpoints, it stays inside
-the AWS network the entire time. For health data that is the right call.
+**Why VPC Endpoints instead of just NAT Gateway:** The Terraform design includes
+VPC endpoints for selected AWS services. Connectivity and routing have not been
+verified in a deployed account.
 
 **Why selective auto-remediation:** I almost built full auto-remediation for everything.
 Then I thought through: what if the Lambda removes an IAM permission that a medical
 record system depends on? A doctor cannot log in. That is a different kind of incident.
-So I wrote a decision matrix based on reversibility without operational impact.
+The decision matrix is the intended policy. The current remediation guardrails are
+stubs, so the policy is not enforced end to end yet.
 
 Full ADRs: docs/adr/
 
@@ -137,11 +150,17 @@ Full ADRs: docs/adr/
 
 ## How to run this
 
+The following bootstrap and `terraform apply` steps create or modify real AWS
+resources and require AWS credentials. They are not needed for the local CI checks
+described in CONTRIBUTING.md, and no deployment is evidenced by this repository.
+
 ```bash
 git clone https://github.com/guinatural/wayfinder-cloud.git
 cd wayfinder-cloud
 
 # First time only: create the S3 bucket and DynamoDB table for Terraform state
+# Configure an AWS CLI profile named wayfinder-dev and install boto3 first
+python -m pip install boto3
 python scripts/bootstrap_state.py --env dev --region us-east-1
 
 # Copy the example and fill in your email
@@ -149,7 +168,7 @@ cp infra/environments/dev/terraform.tfvars.example \
    infra/environments/dev/terraform.tfvars
 
 cd infra/environments/dev
-terraform init
+terraform init -lockfile=readonly
 terraform plan
 terraform apply
 ```
@@ -169,17 +188,18 @@ docs/adr/          9 architecture decision records
 docs/runbooks/     5 operational runbooks
 docs/compliance/   LGPD article to AWS control mapping
 docs/business/     VitaCore scenario and incident post-mortem
-.github/workflows/ 3 CI/CD pipelines
+.github/workflows/ 4 GitHub Actions workflows (CI checks, Terraform, Lambda deploy)
 scripts/           bootstrap script for Terraform state
 ```
 
 ---
 
-## Cost
+## Cost model
 
-Dev environment with just the governance layer: about $38/month.
-Full VitaCore production stack: about $870/month.
-One incident like March 2026: R$ 2,107,000.
+The rough design estimates are about $38/month for the dev governance layer and
+$870/month for a full modeled VitaCore stack. They are not quotes, measured AWS
+bills, or evidence that either environment was deployed. Incident costs are
+fictional scenario inputs.
 
 ---
 

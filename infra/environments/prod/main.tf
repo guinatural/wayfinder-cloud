@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Wayfinder Cloud  Environment: prod
 # ATENÇÃO: Este arquivo gerencia infraestrutura de PRODUÇÃO.
 #
@@ -171,7 +171,7 @@ module "remediation" {
   kms_key_arn              = module.storage.kms_key_arn
   critical_topic_arn       = module.notifications.critical_topic_arn
   warning_topic_arn        = module.notifications.warning_topic_arn
-  wayfinder_event_bus_arn   = module.observability.wayfinder_event_bus_arn
+  wayfinder_event_bus_arn  = module.observability.wayfinder_event_bus_arn
 }
 
 ################################################################################

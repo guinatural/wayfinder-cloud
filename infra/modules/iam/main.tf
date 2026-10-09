@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Módulo: iam
 # Responsabilidade: IAM Roles com least privilege para AWS Config e Lambdas
 ################################################################################
@@ -96,8 +96,8 @@ resource "aws_iam_role" "lambda_evaluator" {
 data "aws_iam_policy_document" "lambda_evaluator" {
   # SNS  publicar notificações por severidade
   statement {
-    sid    = "AllowSNSPublish"
-    effect = "Allow"
+    sid     = "AllowSNSPublish"
+    effect  = "Allow"
     actions = ["sns:Publish"]
     resources = [
       "arn:aws:sns:${var.region}:${var.account_id}:${local.name_prefix}-critical",
@@ -107,9 +107,9 @@ data "aws_iam_policy_document" "lambda_evaluator" {
   }
   # CloudWatch  métricas de compliance
   statement {
-    sid    = "AllowCWMetrics"
-    effect = "Allow"
-    actions = ["cloudwatch:PutMetricData"]
+    sid       = "AllowCWMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
     resources = ["*"]
     condition {
       test     = "StringEquals"
@@ -119,8 +119,8 @@ data "aws_iam_policy_document" "lambda_evaluator" {
   }
   # EventBridge  publicar eventos de remediação
   statement {
-    sid    = "AllowEventBridgePut"
-    effect = "Allow"
+    sid     = "AllowEventBridgePut"
+    effect  = "Allow"
     actions = ["events:PutEvents"]
     resources = [
       "arn:aws:events:${var.region}:${var.account_id}:event-bus/wayfinder-events",
@@ -128,16 +128,16 @@ data "aws_iam_policy_document" "lambda_evaluator" {
   }
   # Config  descrever regras para contexto
   statement {
-    sid    = "AllowConfigDescribe"
-    effect = "Allow"
-    actions = ["config:DescribeConfigRules"]
+    sid       = "AllowConfigDescribe"
+    effect    = "Allow"
+    actions   = ["config:DescribeConfigRules"]
     resources = ["*"]
   }
   # Resource Groups Tagging  obter tags dos recursos avaliados
   statement {
-    sid    = "AllowTaggingAPI"
-    effect = "Allow"
-    actions = ["tag:GetResources"]
+    sid       = "AllowTaggingAPI"
+    effect    = "Allow"
+    actions   = ["tag:GetResources"]
     resources = ["*"]
   }
   # X-Ray  tracing distribuído
@@ -227,8 +227,8 @@ data "aws_iam_policy_document" "lambda_remediation" {
   }
   # CloudTrail  reabilitar logging
   statement {
-    sid    = "AllowCloudTrailStart"
-    effect = "Allow"
+    sid     = "AllowCloudTrailStart"
+    effect  = "Allow"
     actions = ["cloudtrail:StartLogging", "cloudtrail:GetTrailStatus"]
     resources = [
       "arn:aws:cloudtrail:${var.region}:${var.account_id}:trail/*",
@@ -252,9 +252,9 @@ data "aws_iam_policy_document" "lambda_remediation" {
   }
   # CloudWatch  métricas de remediação
   statement {
-    sid    = "AllowCWMetrics"
-    effect = "Allow"
-    actions = ["cloudwatch:PutMetricData"]
+    sid       = "AllowCWMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
     resources = ["*"]
     condition {
       test     = "StringEquals"
@@ -278,8 +278,8 @@ data "aws_iam_policy_document" "lambda_remediation" {
   }
   # EventBridge  publicar resultados de remediação
   statement {
-    sid    = "AllowEventBridgePut"
-    effect = "Allow"
+    sid     = "AllowEventBridgePut"
+    effect  = "Allow"
     actions = ["events:PutEvents"]
     resources = [
       "arn:aws:events:${var.region}:${var.account_id}:event-bus/wayfinder-events",
@@ -381,9 +381,9 @@ data "aws_iam_policy_document" "lambda_reporter" {
     ]
   }
   statement {
-    sid    = "AllowS3ReportWrite"
-    effect = "Allow"
-    actions = ["s3:PutObject"]
+    sid       = "AllowS3ReportWrite"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
     resources = ["${var.audit_bucket_arn}/compliance-reports/*"]
   }
   # Glue  catalogar dados para Athena
@@ -403,8 +403,8 @@ data "aws_iam_policy_document" "lambda_reporter" {
   }
   # SNS  publicar resumo do relatório
   statement {
-    sid    = "AllowSNSPublish"
-    effect = "Allow"
+    sid     = "AllowSNSPublish"
+    effect  = "Allow"
     actions = ["sns:Publish"]
     resources = [
       "arn:aws:sns:${var.region}:${var.account_id}:${local.name_prefix}-info",

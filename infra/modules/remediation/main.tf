@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Módulo: remediation
 # Responsabilidade: Lambdas de remediação/notificação, DynamoDB, SQS DLQ
 ################################################################################
@@ -110,10 +110,10 @@ resource "aws_lambda_function" "auto_remediation" {
 
   environment {
     variables = {
-      ENVIRONMENT               = var.environment
+      ENVIRONMENT                = var.environment
       REMEDIATION_ATTEMPTS_TABLE = aws_dynamodb_table.remediation_attempts.name
-      WARNING_TOPIC_ARN         = var.warning_topic_arn
-      CRITICAL_TOPIC_ARN        = var.critical_topic_arn
+      WARNING_TOPIC_ARN          = var.warning_topic_arn
+      CRITICAL_TOPIC_ARN         = var.critical_topic_arn
       WAYFINDER_EVENT_BUS_NAME   = split("/", var.wayfinder_event_bus_arn)[1]
     }
   }
@@ -152,9 +152,9 @@ resource "aws_lambda_function" "incident_notifier" {
 
   environment {
     variables = {
-      ENVIRONMENT               = var.environment
-      SLACK_WEBHOOK_URL         = ""
-      CLOUDWATCH_DASHBOARD_URL  = "https://console.aws.amazon.com/cloudwatch/home#dashboards:name=wayfinder-command-center-${var.environment}"
+      ENVIRONMENT              = var.environment
+      SLACK_WEBHOOK_URL        = ""
+      CLOUDWATCH_DASHBOARD_URL = "https://console.aws.amazon.com/cloudwatch/home#dashboards:name=wayfinder-command-center-${var.environment}"
     }
   }
 

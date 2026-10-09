@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Módulo: storage
 # Responsabilidade: KMS CMK + S3 buckets (audit, reports, lambda packages)
 ################################################################################
@@ -62,7 +62,7 @@ resource "aws_kms_key" "wayfinder" {
   })
 
   tags = {
-    Name            = "${local.name_prefix}-cmk"
+    Name               = "${local.name_prefix}-cmk"
     DataClassification = "security-critical"
   }
 }
@@ -103,8 +103,8 @@ resource "aws_s3_bucket_object_lock_configuration" "audit_trail" {
 
   rule {
     default_retention {
-      mode  = var.environment == "prod" ? "COMPLIANCE" : "GOVERNANCE"
-      days  = var.audit_retention_days
+      mode = var.environment == "prod" ? "COMPLIANCE" : "GOVERNANCE"
+      days = var.audit_retention_days
     }
   }
 }
@@ -196,10 +196,10 @@ resource "aws_s3_bucket_policy" "audit_trail" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "DenyNonTLSRequests"
-        Effect = "Deny"
+        Sid       = "DenyNonTLSRequests"
+        Effect    = "Deny"
         Principal = "*"
-        Action = "s3:*"
+        Action    = "s3:*"
         Resource = [
           aws_s3_bucket.audit_trail.arn,
           "${aws_s3_bucket.audit_trail.arn}/*"

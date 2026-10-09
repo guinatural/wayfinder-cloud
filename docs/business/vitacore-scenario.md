@@ -1,5 +1,11 @@
 ﻿# Cenário de Negócio  VitaCore Health
 
+> **Exercício fictício de portfólio:** VitaCore, os dados empresariais, o incidente e
+> os valores deste documento são premissas de cenário, não um cliente ou incidente
+> real. Os SLAs e impactos financeiros abaixo não são evidência operacional. A
+> retenção de 20 anos é um requisito do cenário; o exemplo Terraform de produção
+> atualmente define 365 dias e não o atende.
+
 **Documento:** Context Empresarial e Motivação Técnica  
 **Versão:** 1.0 | **Classificação:** Interno  Restrito  
 **Autor:** Equipe de Architecture  
